@@ -1474,20 +1474,31 @@ function updateCtxHint(){
   }).join(" · ");
   el.innerHTML=`Context: item <b>${esc(it?it.name:"—")}</b> · owner <b>${esc(own?own.name:"—")}</b>${attrBits?" · "+attrBits:""}`;
 }
+// Evaluate the current selection. Reactive: re-run on every selector change and on
+// entering the tab so the verdict/trace/effective panel always reflect live config.
 function runPlayground(){
+  const v=document.getElementById("verdict");
+  const tr=document.getElementById("trace");
   const userId=document.getElementById("pgUser").value;
   const resKey=document.getElementById("pgRes").value;
   const action=document.getElementById("pgAction").value;
+  const user=userById(userId), resType=resByKey(resKey);
+  // nothing valid to evaluate yet (e.g. no users or no resource types configured)
+  if(!user || !resType || !action){
+    v.className="verdict";
+    v.innerHTML=`<div class="big">—</div><div class="sub">${!user?"No subject available":!resType?"No resource type available":"This type declares no actions"}</div>`;
+    tr.innerHTML=`<li class="empty" style="border:none;background:none">Nothing to evaluate.</li>`;
+    if(user) renderEffective(userId); else document.getElementById("effPerms").innerHTML=`<p class="empty">No user selected.</p>`;
+    return;
+  }
   const item=itemById(document.getElementById("pgItem").value);
   // ctx carries the selected item's owner + its per-attribute value overrides; buildAttrs()
   // resolves each resource.* attribute to the item's value or the type's declared default.
   const ctx={ owner:item?item.owner:"", attrs:item&&item.attrs||{} };
   const res=decide(userId,resKey,action,ctx);
-  const v=document.getElementById("verdict");
   v.className="verdict "+(res.allow?"allow":"deny");
   v.innerHTML=`<div class="big">${res.allow?"✓ ALLOW":"✕ DENY"}</div>
-    <div class="sub"><span class="mono">${esc(userById(userId).name)}</span> → <span class="mono">${esc(action)}</span> on <span class="mono">${esc(resByKey(resKey).name)}</span> · ${esc(res.reason)}</div>`;
-  const tr=document.getElementById("trace");
+    <div class="sub"><span class="mono">${esc(user.name)}</span> → <span class="mono">${esc(action)}</span> on <span class="mono">${esc(resType.name)}</span> · ${esc(res.reason)}</div>`;
   tr.innerHTML=res.trace.map((s,i)=>`<li><div class="ic ${s.k==='ok'?'ok':s.k==='no'?'no':s.k==='warn'?'warn':'info'}">${i+1}</div>
     <div class="body"><div class="t">${esc(s.t)}</div><div class="d">${esc(s.d)}</div></div></li>`).join("");
   renderEffective(userId);
@@ -1517,7 +1528,7 @@ function switchView(name){
   document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.view===name));
   document.getElementById("view-config").classList.toggle("active",name==="config");
   document.getElementById("view-play").classList.toggle("active",name==="play");
-  if(name==="play"){ fillPlaygroundSelectors(); renderEffective(document.getElementById("pgUser").value); }
+  if(name==="play"){ fillPlaygroundSelectors(); runPlayground(); }
 }
 document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>switchView(t.dataset.view));
 
@@ -1543,9 +1554,10 @@ document.getElementById("addItemBtn").onclick=addItem;
 document.getElementById("addCondBtn").onclick=()=>addCondition();
 document.getElementById("matrixFilter").oninput=renderMatrix;
 document.getElementById("itemTypeFilter").onchange=renderItems;
-document.getElementById("pgRes").onchange=()=>{ fillItems(); fillActions(); };
-document.getElementById("pgItem").onchange=updateCtxHint;
-document.getElementById("pgUser").onchange=()=>renderEffective(document.getElementById("pgUser").value);
+document.getElementById("pgRes").onchange=()=>{ fillItems(); fillActions(); runPlayground(); };
+document.getElementById("pgItem").onchange=()=>{ updateCtxHint(); runPlayground(); };
+document.getElementById("pgUser").onchange=runPlayground;
+document.getElementById("pgAction").onchange=runPlayground;
 document.getElementById("pgRun").onclick=runPlayground;
 document.getElementById("resetBtn").onclick=()=>{
   openModal("Reset everything?", "<p>Discard all changes and restore the seed dataset?</p>",[
@@ -1562,7 +1574,7 @@ document.addEventListener("click",(e)=>{
 });
 document.addEventListener("keydown",(e)=>{ if(e.key==="Escape") closePermMenu(); });
 
-function renderAll(){ renderStats(); renderRoleList(); renderUserList(); renderResources(); renderItems(); renderConditionsPanel(); renderMatrix(); if(document.getElementById("view-play").classList.contains("active")) fillPlaygroundSelectors(); }
+function renderAll(){ renderStats(); renderRoleList(); renderUserList(); renderResources(); renderItems(); renderConditionsPanel(); renderMatrix(); if(document.getElementById("view-play").classList.contains("active")){ fillPlaygroundSelectors(); runPlayground(); } }
 renderAll();
 </script>
 </body>
