@@ -1,0 +1,1394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KAM — Access Control Manager</title>
+<style>
+  :root {
+    --bg: #f5f7fa;
+    --panel: #ffffff;
+    --panel-2: #eef1f5;
+    --border: #d4dae2;
+    --border-soft: #e6eaef;
+    --text: #1c2330;
+    --muted: #5c6675;
+    --muted-2: #8a93a0;
+    --accent: #2563eb;
+    --accent-dim: #dce7ff;
+    --green: #1a8a35;
+    --green-dim: #dcf3e1;
+    --red: #d12b25;
+    --red-dim: #fbe1e0;
+    --amber: #9a6f00;
+    --amber-dim: #f7eccb;
+    --purple: #7c3aed;
+    --radius: 10px;
+    --shadow: 0 8px 24px rgba(20,30,50,.08);
+    font-size: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); }
+
+  /* Layout */
+  header.topbar {
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 22px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #ffffff, #f5f7fa);
+    position: sticky; top: 0; z-index: 30;
+  }
+  .logo {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), var(--purple));
+    display: grid; place-items: center; font-weight: 800; color: #fff;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.06) inset;
+  }
+  .brand { font-weight: 700; font-size: 16px; letter-spacing: .2px; }
+  .brand small { display:block; font-weight: 500; color: var(--muted); font-size: 11px; letter-spacing: .4px; }
+  .topbar .spacer { flex: 1; }
+  .tabs { display: flex; gap: 4px; background: var(--panel-2); padding: 4px; border-radius: 10px; border: 1px solid var(--border); }
+  .tab {
+    padding: 8px 18px; border-radius: 7px; cursor: pointer; font-weight: 600;
+    color: var(--muted); border: none; background: transparent; font-size: 13px;
+    transition: .15s;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { background: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(76,141,255,.4); }
+
+  .pill {
+    font-size: 11px; padding: 3px 9px; border-radius: 999px; font-weight: 600;
+    background: var(--green-dim); color: var(--green); border: 1px solid rgba(63,185,80,.3);
+  }
+
+  main { padding: 22px; max-width: 1500px; margin: 0 auto; }
+  .view { display: none; }
+  .view.active { display: block; animation: fade .25s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px);} to {opacity:1; transform:none;} }
+
+  .grid { display: grid; gap: 18px; }
+  .cols-sidebar { grid-template-columns: 290px minmax(0, 1fr); align-items: start; }
+  @media (max-width: 1000px){ .cols-sidebar { grid-template-columns: minmax(0, 1fr); } }
+  .pg-grid { grid-template-columns: 380px minmax(0, 1fr); align-items: start; }
+  @media (max-width: 1000px){ .pg-grid { grid-template-columns: minmax(0, 1fr); } }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    min-width: 0; /* allow cards to shrink to their grid track instead of overflowing onto neighbors */
+  }
+  .card .hd {
+    display:flex; align-items:center; gap:10px; padding: 14px 16px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .card .hd h3 { margin: 0; font-size: 14px; }
+  .card .hd .sub { color: var(--muted); font-size: 12px; }
+  .card .bd { padding: 14px 16px; }
+  .card .hd .spacer { flex: 1; }
+
+  /* Sidebar list */
+  .listitem {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px;
+    cursor: pointer; border: 1px solid transparent; margin-bottom: 4px;
+  }
+  .listitem:hover { background: var(--panel-2); }
+  .listitem.active { background: var(--accent-dim); border-color: rgba(76,141,255,.4); }
+  .listitem .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); flex: none; }
+  .listitem .meta { flex: 1; min-width: 0; }
+  .listitem .meta .name { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .listitem .meta .desc { color: var(--muted); font-size: 11px; white-space: nowrap; overflow:hidden; text-overflow: ellipsis; }
+  .listitem .count { font-size: 11px; color: var(--muted); background: var(--panel-2); padding: 2px 8px; border-radius: 999px; }
+
+  /* Buttons & inputs */
+  button.btn {
+    border: 1px solid var(--border); background: var(--panel-2); color: var(--text);
+    padding: 8px 14px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px;
+    display: inline-flex; align-items: center; gap: 7px; transition: .15s;
+  }
+  button.btn:hover { border-color: var(--accent); }
+  button.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.btn.primary:hover { filter: brightness(1.08); }
+  button.btn.ghost { background: transparent; }
+  button.btn.danger { color: var(--red); border-color: rgba(248,81,73,.3); }
+  button.btn.danger:hover { background: var(--red-dim); }
+  button.btn.sm { padding: 5px 10px; font-size: 12px; }
+  button.icon { background:none;border:none;color:var(--muted-2);cursor:pointer;font-size:14px;padding:4px;border-radius:6px; }
+  button.icon:hover { color: var(--red); background: var(--red-dim); }
+
+  input[type=text], input[type=search], select, textarea {
+    background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    padding: 9px 11px; border-radius: 8px; font-size: 13px; width: 100%; font-family: inherit;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(76,141,255,.15); }
+  label.field { display: block; margin-bottom: 12px; }
+  label.field > span { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; font-weight: 600; }
+  .row { display: flex; gap: 10px; align-items: center; }
+  .row.wrap { flex-wrap: wrap; }
+
+  /* Permission matrix */
+  .matrix-wrap { overflow: auto; border: 1px solid var(--border-soft); border-radius: 10px; }
+  table.matrix { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 12.5px; }
+  table.matrix th, table.matrix td { padding: 0; }
+  table.matrix thead th {
+    position: sticky; top: 0; z-index: 5; background: var(--panel-2);
+    border-bottom: 1px solid var(--border); padding: 10px 8px; font-weight: 600; text-align: center;
+    color: var(--muted); white-space: nowrap;
+  }
+  table.matrix thead th.resource-col { text-align: left; left: 0; z-index: 6; min-width: 220px; }
+  table.matrix tbody td.resource-col {
+    position: sticky; left: 0; z-index: 4; background: var(--panel);
+    border-right: 1px solid var(--border); padding: 10px 12px; text-align: left;
+  }
+  table.matrix tbody td.resource-col .rname { font-weight: 600; }
+  table.matrix tbody td.resource-col .rkey { color: var(--muted-2); font-size: 11px; font-family: ui-monospace, Menlo, monospace; }
+  table.matrix .domain-row td {
+    background: var(--panel-2); color: var(--purple); font-weight: 700; font-size: 11px;
+    text-transform: uppercase; letter-spacing: .6px; padding: 8px 12px; border-bottom: 1px solid var(--border-soft);
+    position: sticky; left: 0;
+  }
+  table.matrix tbody td.cell { text-align: center; border-bottom: 1px solid var(--border-soft); }
+  table.matrix tbody tr:hover td { background: var(--panel-2); }
+  table.matrix tbody tr:hover td.resource-col { background: var(--panel-2); }
+
+  .perm {
+    width: 26px; height: 26px; border-radius: 7px; border: 1px solid var(--border);
+    background: var(--bg); cursor: pointer; display: inline-grid; place-items: center;
+    font-size: 13px; transition: .12s; color: transparent;
+  }
+  .perm:hover { border-color: var(--accent); }
+  .perm.on { background: var(--green-dim); border-color: rgba(63,185,80,.5); color: var(--green); }
+  .perm.cond { background: var(--amber-dim); border-color: rgba(210,153,34,.5); color: var(--amber); }
+  .perm.inherited { background: var(--accent-dim); border-color: rgba(76,141,255,.4); color: var(--accent); cursor: not-allowed; }
+
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 12px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+
+  .tag {
+    display: inline-flex; align-items:center; gap:6px; font-size: 11px; padding: 3px 9px; border-radius: 999px;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text); margin: 2px;
+  }
+  .tag.role { background: var(--accent-dim); border-color: rgba(76,141,255,.35); }
+  .tag.removable { padding-right: 4px; }
+  .tag .x { cursor: pointer; color: var(--muted-2); padding: 0 3px; }
+  .tag .x:hover { color: var(--red); }
+
+  .empty { color: var(--muted-2); font-size: 13px; padding: 20px; text-align: center; font-style: italic; }
+
+  /* Playground */
+  .verdict {
+    border-radius: 12px; padding: 22px; text-align: center; border: 1px solid var(--border);
+    background: var(--panel-2); margin-bottom: 16px;
+  }
+  .verdict.allow { background: linear-gradient(180deg, var(--green-dim), var(--panel)); border-color: rgba(63,185,80,.5); }
+  .verdict.deny { background: linear-gradient(180deg, var(--red-dim), var(--panel)); border-color: rgba(248,81,73,.5); }
+  .verdict .big { font-size: 30px; font-weight: 800; letter-spacing: .5px; }
+  .verdict.allow .big { color: var(--green); }
+  .verdict.deny .big { color: var(--red); }
+  .verdict .sub { color: var(--muted); margin-top: 4px; font-size: 13px; }
+
+  .trace { list-style: none; margin: 0; padding: 0; }
+  .trace li {
+    display: flex; gap: 12px; padding: 12px 14px; border: 1px solid var(--border-soft);
+    border-radius: 9px; margin-bottom: 8px; background: var(--bg); align-items: flex-start;
+  }
+  .trace li .ic { width: 22px; height: 22px; border-radius: 6px; flex: none; display: grid; place-items: center; font-size: 12px; font-weight: 800; }
+  .trace li .ic.ok { background: var(--green-dim); color: var(--green); }
+  .trace li .ic.no { background: var(--red-dim); color: var(--red); }
+  .trace li .ic.info { background: var(--accent-dim); color: var(--accent); }
+  .trace li .ic.warn { background: var(--amber-dim); color: var(--amber); }
+  .trace li .body { flex: 1; }
+  .trace li .body .t { font-weight: 600; font-size: 13px; }
+  .trace li .body .d { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  code, .mono { font-family: ui-monospace, Menlo, monospace; }
+  .kbd { font-family: ui-monospace, Menlo, monospace; background: var(--panel-2); padding: 1px 6px; border-radius: 5px; border: 1px solid var(--border); font-size: 12px; }
+
+  .stat-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  .stat { flex: 1; min-width: 130px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .stat .n { font-size: 24px; font-weight: 800; }
+  .stat .l { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+  /* Modal */
+  .modal-back {
+    position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 100; display: none;
+    align-items: center; justify-content: center; backdrop-filter: blur(2px);
+  }
+  .modal-back.open { display: flex; }
+  .modal { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; width: 440px; max-width: 92vw; box-shadow: var(--shadow); }
+  .modal .hd { padding: 16px 18px; border-bottom: 1px solid var(--border-soft); font-weight: 700; display:flex; align-items:center; }
+  .modal .hd .spacer { flex:1; }
+  .modal .bd { padding: 18px; }
+  .modal .ft { padding: 14px 18px; border-top: 1px solid var(--border-soft); display: flex; justify-content: flex-end; gap: 10px; }
+
+  /* Permission cell popover — ABAC config lives here */
+  .permmenu {
+    position: absolute; z-index: 150; min-width: 290px; max-width: 340px; max-height: 380px; overflow: auto;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 11px;
+    box-shadow: var(--shadow); padding: 6px; display: none;
+  }
+  .permmenu.open { display: block; animation: fade .12s ease; }
+  .permmenu .opt { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+  .permmenu .opt:hover { background: var(--panel-2); }
+  .permmenu .pmradio { width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--border); flex: none; }
+  .permmenu .opt:hover .pmradio { border-color: var(--accent); }
+  .permmenu .pmradio.on { border-color: var(--accent); background: var(--accent); box-shadow: inset 0 0 0 2.5px var(--panel); }
+  .permmenu .pmcheck { width: 16px; height: 16px; border-radius: 5px; border: 2px solid var(--border); flex: none; display: grid; place-items: center; font-size: 11px; font-weight: 800; color: #fff; }
+  .permmenu .opt:hover .pmcheck { border-color: var(--amber); }
+  .permmenu .pmcheck.on { background: var(--amber); border-color: var(--amber); }
+  .permmenu .pmtext { flex: 1; min-width: 0; }
+  .permmenu .pmtitle { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .permmenu .pmexpr { color: var(--muted); font-size: 11px; font-family: ui-monospace, Menlo, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .permmenu .pmacts { display: flex; gap: 1px; flex: none; }
+  .permmenu .pmacts button.icon { color: var(--muted-2); }
+  .permmenu .pmacts button.icon:hover { color: var(--accent); background: var(--accent-dim); }
+  .permmenu .pmacts button.pmdel:hover { color: var(--red); background: var(--red-dim); }
+  .permmenu .pmsep { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted-2); font-weight: 700; padding: 9px 10px 4px; }
+  .permmenu .pmdiv { height: 1px; background: var(--border-soft); margin: 5px 4px; }
+  .permmenu .pmempty { color: var(--muted-2); font-size: 12px; font-style: italic; padding: 4px 10px 8px; }
+  .permmenu .pmnew .pmtitle { color: var(--accent); }
+
+  .checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px,1fr)); gap: 8px; }
+  .chk { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 7px 9px; border: 1px solid var(--border-soft); border-radius: 7px; cursor: pointer; }
+  .chk:hover { border-color: var(--accent); }
+  .chk input { accent-color: var(--accent); }
+
+  .scope-bar { display:flex; gap:8px; align-items:center; padding: 10px 14px; background: var(--panel-2); border:1px solid var(--border); border-radius: 9px; margin-bottom: 14px; font-size: 12px; color: var(--muted); flex-wrap: wrap;}
+  .toast {
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--panel-2); border: 1px solid var(--border); padding: 11px 18px; border-radius: 10px;
+    box-shadow: var(--shadow); opacity: 0; transition: .25s; z-index: 200; font-size: 13px; font-weight: 600;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.ok { border-color: rgba(63,185,80,.5); }
+  .hint { color: var(--muted-2); font-size: 12px; line-height: 1.5; }
+  .divider { height:1px; background: var(--border-soft); margin: 14px 0; }
+
+  /* Configuration sub-tabs */
+  .subtabs {
+    display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .subtab {
+    padding: 9px 16px; border: none; background: transparent; cursor: pointer;
+    font-weight: 600; font-size: 13px; color: var(--muted); border-radius: 8px 8px 0 0;
+    border-bottom: 2px solid transparent; margin-bottom: -1px; transition: .15s;
+  }
+  .subtab:hover { color: var(--text); background: var(--panel-2); }
+  .subtab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .subview { display: none; }
+  .subview.active { display: block; animation: fade .2s ease; }
+
+  /* Collapsible cards */
+  .card .hd .chev {
+    color: var(--muted-2); font-size: 11px; transition: transform .15s; user-select: none;
+    cursor: pointer; padding: 2px 4px; border-radius: 5px;
+  }
+  .card .hd .chev:hover { color: var(--text); background: var(--panel-2); }
+  .card.collapsed > .hd .chev { transform: rotate(-90deg); }
+  .card.collapsed > .bd { display: none; }
+
+  /* Config tables */
+  .cfg-wrap { overflow-x: auto; border: 1px solid var(--border-soft); border-radius: 10px; }
+  table.cfg { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13px; }
+  table.cfg thead th {
+    text-align: left; font-weight: 600; color: var(--muted); font-size: 11px;
+    text-transform: uppercase; letter-spacing: .5px; padding: 9px 14px;
+    border-bottom: 1px solid var(--border); background: var(--panel-2); white-space: nowrap;
+  }
+  table.cfg tbody td { padding: 10px 14px; border-bottom: 1px solid var(--border-soft); vertical-align: middle; }
+  table.cfg tbody tr:last-child td { border-bottom: none; }
+  table.cfg tbody tr.clickable { cursor: pointer; }
+  table.cfg tbody tr.clickable:hover td { background: var(--panel-2); }
+  table.cfg tbody tr.active td { background: var(--accent-dim); }
+  table.cfg td.actcell { text-align: right; white-space: nowrap; width: 1%; }
+  table.cfg td.empty { text-align: center; }
+  .idot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:8px; vertical-align:middle; }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="logo">K</div>
+  <div class="brand">KAM <small>FINE-GRAINED ACCESS CONTROL</small></div>
+  <span class="pill" id="modeBadge">RBAC · ABAC conditions</span>
+  <div class="spacer"></div>
+  <div class="tabs">
+    <button class="tab active" data-view="config">⚙ Configuration</button>
+    <button class="tab" data-view="play">▶ Playground</button>
+  </div>
+  <button class="btn ghost sm" onclick="location.href='solution-overview.html'" title="Back to solution overview">← Overview</button>
+  <button class="btn ghost sm" id="resetBtn" title="Reset to seed data">↺ Reset</button>
+</header>
+
+<main>
+  <!-- ============ CONFIGURATION ============ -->
+  <section class="view active" id="view-config">
+    <div class="stat-row" id="statRow"></div>
+
+    <div class="subtabs" id="cfgSubtabs">
+      <button class="subtab active" data-sub="roles">Roles &amp; Permissions</button>
+      <button class="subtab" data-sub="users">Users</button>
+      <button class="subtab" data-sub="restypes">Resource Types</button>
+      <button class="subtab" data-sub="items">Resource Items</button>
+    </div>
+
+    <!-- Roles & Permissions -->
+    <div class="subview active" id="sub-roles">
+      <div class="row" style="margin-bottom:14px;">
+        <div class="spacer" style="flex:1"></div>
+        <button class="btn sm" id="collapseRolesBtn">⊟ Collapse all</button>
+        <button class="btn sm" id="expandRolesBtn">⊞ Expand all</button>
+      </div>
+      <div class="grid" style="gap:18px;">
+        <div class="card collapsible">
+          <div class="hd">
+            <span class="chev" title="Collapse / expand">▾</span>
+            <h3>Roles</h3>
+            <span class="sub" id="roleCount"></span>
+            <div class="spacer"></div>
+            <button class="btn sm primary" id="addRoleBtn">+ Role</button>
+          </div>
+          <div class="bd"><div class="cfg-wrap"><table class="cfg" id="roleTable"></table></div></div>
+        </div>
+
+        <div class="card collapsible">
+          <div class="hd">
+            <span class="chev" title="Collapse / expand">▾</span>
+            <h3 id="matrixTitle">Permission Matrix</h3>
+            <div class="spacer"></div>
+            <button class="btn sm" id="editRoleBtn">✎ Edit role</button>
+            <button class="btn sm danger" id="delRoleBtn">Delete</button>
+          </div>
+          <div class="bd">
+            <div class="scope-bar" id="roleInfoBar"></div>
+            <div class="row" style="margin-bottom:12px;">
+              <input type="search" id="matrixFilter" placeholder="Filter resources or actions…" style="max-width:320px;">
+              <div class="spacer" style="flex:1"></div>
+              <span class="hint">Click a cell to set access &amp; manage ABAC conditions</span>
+            </div>
+            <div class="matrix-wrap">
+              <table class="matrix" id="matrix"></table>
+            </div>
+            <div class="legend">
+              <span><span class="swatch" style="background:var(--green-dim);border:1px solid rgba(63,185,80,.5)"></span> Granted</span>
+              <span><span class="swatch" style="background:var(--amber-dim);border:1px solid rgba(210,153,34,.5)"></span> Conditional (ABAC)</span>
+              <span><span class="swatch" style="background:var(--accent-dim);border:1px solid rgba(76,141,255,.4)"></span> Inherited from parent role</span>
+              <span><span class="swatch" style="background:var(--bg);border:1px solid var(--border)"></span> No access</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card collapsible">
+          <div class="hd">
+            <span class="chev" title="Collapse / expand">▾</span>
+            <h3>ABAC Conditions</h3>
+            <span class="sub" id="condPanelCount"></span>
+            <div class="spacer"></div>
+            <button class="btn sm primary" id="addCondBtn">+ Condition</button>
+          </div>
+          <div class="bd">
+            <p class="hint" style="margin:0 0 12px;">Attribute rules evaluated at decision time. Assign one or more to a grant by clicking a matrix cell — when a grant carries several conditions they must <b>all</b> pass. The <b>In use</b> count is how many grants reference each rule.</p>
+            <div class="cfg-wrap"><table class="cfg" id="condTable"></table></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Users -->
+    <div class="subview" id="sub-users">
+      <div class="card">
+        <div class="hd">
+          <h3>Users</h3>
+          <div class="spacer"></div>
+          <button class="btn sm primary" id="addUserBtn">+ User</button>
+        </div>
+        <div class="bd"><div class="cfg-wrap"><table class="cfg" id="userTable"></table></div></div>
+      </div>
+    </div>
+
+    <!-- Resource Types -->
+    <div class="subview" id="sub-restypes">
+      <div class="card">
+        <div class="hd">
+          <h3>Resource Types</h3>
+          <div class="spacer"></div>
+          <button class="btn sm primary" id="addResBtn">+ Type</button>
+        </div>
+        <div class="bd">
+          <p class="hint" style="margin:0 0 12px;">Resource types are the classes of protected object that roles get permissions on. Each defines its own <b>actions</b> and the <b>department</b> attribute used by ABAC conditions.</p>
+          <div class="cfg-wrap"><table class="cfg" id="resTable"></table></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Resource Items -->
+    <div class="subview" id="sub-items">
+      <div class="card">
+        <div class="hd">
+          <h3>Resource Items</h3>
+          <div class="spacer"></div>
+          <button class="btn sm primary" id="addItemBtn">+ Item</button>
+        </div>
+        <div class="bd">
+          <p class="hint" style="margin:0 0 12px;">Concrete instances of a resource type. Each item has an <b>owner</b> — the subject checked by the <b>If owner</b> condition at decision time. A type itself has no owner.</p>
+          <div class="row" style="margin:0 0 12px;">
+            <span class="hint" style="font-weight:600">Filter by type</span>
+            <select id="itemTypeFilter" style="max-width:280px"></select>
+            <span class="hint" id="itemFilterCount"></span>
+          </div>
+          <div class="cfg-wrap"><table class="cfg" id="itemTable"></table></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PLAYGROUND ============ -->
+  <section class="view" id="view-play">
+    <div class="grid pg-grid">
+      <div class="card">
+        <div class="hd"><h3>Access Request</h3><span class="sub">Simulate a check</span></div>
+        <div class="bd">
+          <label class="field"><span>Subject (user)</span>
+            <select id="pgUser"></select></label>
+          <label class="field"><span>Resource type</span>
+            <select id="pgRes"></select></label>
+          <label class="field"><span>Resource item</span>
+            <select id="pgItem"></select></label>
+          <label class="field"><span>Action</span>
+            <select id="pgAction"></select></label>
+
+          <button class="btn primary" id="pgRun" style="width:100%;justify-content:center;margin-top:6px;">▶ Evaluate access</button>
+          <p class="hint" id="pgCtxHint" style="margin-top:12px;"></p>
+          <p class="hint" style="margin-top:10px;">The engine resolves the subject's roles (incl. inherited), collects matching grants, and evaluates ABAC conditions against the item's owner and the type's department. <b>Explicit deny &gt; allow.</b></p>
+        </div>
+      </div>
+
+      <div>
+        <div class="verdict" id="verdict">
+          <div class="big">—</div>
+          <div class="sub">Configure a request and press Evaluate</div>
+        </div>
+        <div class="card">
+          <div class="hd"><h3>Evaluation Trace</h3><span class="sub">Decision path</span></div>
+          <div class="bd"><ul class="trace" id="trace"><li class="empty" style="border:none;background:none">No evaluation yet.</li></ul></div>
+        </div>
+
+        <div class="card" style="margin-top:18px;">
+          <div class="hd"><h3>Effective Permissions</h3><span class="sub" id="effSub">for selected user</span></div>
+          <div class="bd" id="effPerms"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- Generic modal -->
+<div class="modal-back" id="modalBack">
+  <div class="modal">
+    <div class="hd"><span id="modalTitle">Modal</span><div class="spacer"></div><button class="icon" id="modalClose" style="color:var(--muted)">✕</button></div>
+    <div class="bd" id="modalBody"></div>
+    <div class="ft" id="modalFoot"></div>
+  </div>
+</div>
+
+<!-- ABAC permission popover (anchored to a matrix cell) -->
+<div class="permmenu" id="permMenu"></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   KAM — RBAC + ABAC prototype. All state in-memory + localStorage.
+   ============================================================ */
+
+const ACTIONS_LIB = ["create","read","update","delete","list","approve","export","share","admin"];
+const DOMAINS = ["Billing","Human Resources","CRM","Infrastructure","Governance","Sales","Support","Operations"];
+
+function seed() {
+  return {
+    resources: [
+      { key:"billing.invoice", name:"Invoices", domain:"Billing", dept:"Finance", sensitivity:3, region:"US", actions:["create","read","update","delete","list","approve","export"] },
+      { key:"billing.payment", name:"Payments", domain:"Billing", dept:"Finance", sensitivity:4, region:"US", actions:["read","list","approve","export"] },
+      { key:"hr.employee", name:"Employee Records", domain:"Human Resources", dept:"People", sensitivity:4, region:"EU", actions:["create","read","update","delete","list","export"] },
+      { key:"hr.payroll", name:"Payroll", domain:"Human Resources", dept:"People", sensitivity:5, region:"EU", actions:["read","update","approve","export"] },
+      { key:"crm.account", name:"Customer Accounts", domain:"CRM", dept:"Sales", sensitivity:2, region:"US", actions:["create","read","update","delete","list","share"] },
+      { key:"crm.deal", name:"Deals", domain:"CRM", dept:"Sales", sensitivity:3, region:"US", actions:["create","read","update","delete","list","approve"] },
+      { key:"infra.cluster", name:"Compute Clusters", domain:"Infrastructure", dept:"Platform", sensitivity:4, region:"US", actions:["read","update","delete","admin"] },
+      { key:"infra.secret", name:"Secrets Vault", domain:"Infrastructure", dept:"Platform", sensitivity:5, region:"US", actions:["read","update","admin"] },
+      { key:"audit.log", name:"Audit Logs", domain:"Governance", dept:"Platform", sensitivity:4, region:"US", actions:["read","list","export"] },
+    ],
+    // concrete instances of a resource type; owner lives here, never on the type
+    items: [
+      { id:"i_inv1", name:"INV-1001 · Acme Corp", type:"billing.invoice", owner:"u2" },
+      { id:"i_inv2", name:"INV-1002 · Globex", type:"billing.invoice", owner:"u1" },
+      { id:"i_pay1", name:"PAY-5001 · Acme Corp", type:"billing.payment", owner:"u2" },
+      { id:"i_emp1", name:"Employee: Alice Chen", type:"hr.employee", owner:"u3" },
+      { id:"i_emp2", name:"Employee: Sam Lee", type:"hr.employee", owner:"u3" },
+      { id:"i_pr1",  name:"Payroll Run 2026-06", type:"hr.payroll", owner:"u3" },
+      { id:"i_acc1", name:"Account: Acme Corp", type:"crm.account", owner:"u1" },
+      { id:"i_acc2", name:"Account: Globex", type:"crm.account", owner:"u5" },
+      { id:"i_deal1", name:"Deal: Acme Renewal", type:"crm.deal", owner:"u1" },
+      { id:"i_deal2", name:"Deal: Globex Expansion", type:"crm.deal", owner:"u5" },
+      { id:"i_clu1", name:"prod-cluster-1", type:"infra.cluster", owner:"u4" },
+      { id:"i_sec1", name:"db-credentials", type:"infra.secret", owner:"u4" },
+      { id:"i_log1", name:"Audit Log: 2026-Q2", type:"audit.log", owner:"u4" },
+    ],
+    conditions: [
+      { id:"own",    label:"If owner",             left:"subject.id",        op:"eq",  rightType:"attr",    right:"resource.owner" },
+      { id:"dept",   label:"Same dept",            left:"subject.dept",      op:"eq",  rightType:"attr",    right:"resource.dept" },
+      { id:"sod",    label:"Separation of duties", left:"subject.id",        op:"neq", rightType:"attr",    right:"resource.owner" },
+      { id:"clr",    label:"Sufficient clearance", left:"subject.clearance", op:"gte", rightType:"attr",    right:"resource.sensitivity" },
+      { id:"active", label:"Active employee",      left:"subject.status",    op:"eq",  rightType:"literal", right:"active" },
+      { id:"region", label:"Same data region",     left:"subject.region",    op:"eq",  rightType:"attr",    right:"resource.region" },
+    ],
+    roles: [
+      { id:"r_base", name:"Employee", desc:"Baseline access for all staff", parent:null,
+        grants:{ "crm.account:read":"allow","crm.account:list":"allow","crm.deal:read":"allow","crm.deal:list":"allow","hr.employee:read":"own" } },
+      { id:"r_sales", name:"Sales Rep", desc:"CRM read/write on owned records", parent:"r_base",
+        grants:{ "crm.account:create":"allow","crm.account:update":"own","crm.deal:create":"allow","crm.deal:update":"own","crm.account:share":"allow" } },
+      { id:"r_sales_mgr", name:"Sales Manager", desc:"Approves deals, full CRM", parent:"r_sales",
+        grants:{ "crm.account:delete":"allow","crm.deal:update":"allow","crm.deal:delete":"allow","crm.deal:approve":"dept" } },
+      { id:"r_fin", name:"Finance Analyst", desc:"Billing read + export", parent:"r_base",
+        grants:{ "billing.invoice:read":"allow","billing.invoice:list":"allow","billing.invoice:export":"allow","billing.payment:read":"allow","billing.payment:list":"allow" } },
+      { id:"r_fin_ctrl", name:"Financial Controller", desc:"Approves invoices & payroll", parent:"r_fin",
+        grants:{ "billing.invoice:create":"allow","billing.invoice:update":"allow","billing.invoice:approve":["sod"],"billing.payment:approve":["sod"],"hr.payroll:read":"allow","hr.payroll:approve":["dept","active"] } },
+      { id:"r_hr", name:"HR Specialist", desc:"Manage employee records", parent:"r_base",
+        grants:{ "hr.employee:create":"allow","hr.employee:update":"allow","hr.employee:list":"allow","hr.payroll:read":"dept" } },
+      { id:"r_sre", name:"SRE", desc:"Infrastructure operations", parent:"r_base",
+        grants:{ "infra.cluster:read":"allow","infra.cluster:update":"allow","infra.secret:read":"clr","audit.log:read":"allow" } },
+      { id:"r_admin", name:"Platform Admin", desc:"Full administrative control", parent:null,
+        grants:{ "infra.cluster:admin":"allow","infra.cluster:delete":"allow","infra.secret:admin":"allow","infra.secret:update":"allow","audit.log:read":"allow","audit.log:export":"allow","hr.payroll:update":"deny" } },
+    ],
+    users: [
+      { id:"u1", name:"Alice Chen", email:"alice@acme.io", dept:"Sales", clearance:3, region:"US", status:"active", roles:["r_sales_mgr"] },
+      { id:"u2", name:"Bob Ortiz", email:"bob@acme.io", dept:"Finance", clearance:4, region:"US", status:"active", roles:["r_fin_ctrl"] },
+      { id:"u3", name:"Priya Nair", email:"priya@acme.io", dept:"People", clearance:4, region:"EU", status:"active", roles:["r_hr"] },
+      { id:"u4", name:"Dmitri Volkov", email:"dmitri@acme.io", dept:"Platform", clearance:5, region:"US", status:"active", roles:["r_sre","r_admin"] },
+      { id:"u5", name:"Sam Lee", email:"sam@acme.io", dept:"Sales", clearance:2, region:"US", status:"suspended", roles:["r_sales"] },
+    ],
+  };
+}
+
+// ABAC attribute namespace: resolved into a flat bag at decision time.
+const ATTRS = [
+  { key:"subject.id" }, { key:"subject.name" }, { key:"subject.dept" }, { key:"subject.email" },
+  { key:"subject.clearance" }, { key:"subject.region" }, { key:"subject.status" },
+  { key:"resource.owner" }, { key:"resource.dept" }, { key:"resource.sensitivity" }, { key:"resource.region" },
+];
+const OPS = {
+  eq:  { sym:"=",  label:"equals" },
+  neq: { sym:"≠",  label:"not equals" },
+  gt:  { sym:">",  label:"greater than" },
+  gte: { sym:"≥",  label:"at least" },
+  lt:  { sym:"<",  label:"less than" },
+  lte: { sym:"≤",  label:"at most" },
+  in:  { sym:"∈",  label:"in list (comma-sep)" },
+};
+
+let DB = load();
+let selectedRoleId = DB.roles[0].id;
+
+function load() {
+  try { const s = localStorage.getItem("sentinel_db"); if (s) return migrate(JSON.parse(s)); } catch(e){}
+  return seed();
+}
+// migrate databases saved under older schema versions
+function migrate(db){
+  if(!Array.isArray(db.conditions)) db.conditions = seed().conditions;
+  // environment removed: drop the env attribute and the built-in "prod" condition
+  delete db.env;
+  db.conditions = db.conditions.filter(c=>c.id!=="prod" && c.left!=="request.env");
+  // add any missing built-in enterprise conditions (sod / clearance / active / region)
+  seed().conditions.forEach(sc=>{ if(!db.conditions.some(c=>c.id===sc.id)) db.conditions.push(sc); });
+  // backfill dept + new ABAC attributes (sensitivity, region) on resource types
+  const seeded = seed().resources;
+  (db.resources||[]).forEach(r=>{
+    const s=seeded.find(x=>x.key===r.key);
+    if(r.dept===undefined){ r.dept = s?s.dept:""; }
+    if(r.sensitivity===undefined){ r.sensitivity = s?s.sensitivity:1; }
+    if(r.region===undefined){ r.region = s?s.region:""; }
+  });
+  // backfill new subject attributes (clearance, region, status) on users
+  const seededU=seed().users;
+  (db.users||[]).forEach(u=>{
+    const s=seededU.find(x=>x.id===u.id);
+    if(u.clearance===undefined){ u.clearance = s?s.clearance:1; }
+    if(u.region===undefined){ u.region = s?s.region:""; }
+    if(u.status===undefined){ u.status = s?s.status:"active"; }
+  });
+  // owner moved from resource types to resource items
+  if(!Array.isArray(db.items)){
+    db.items = (db.resources||[]).filter(r=>r.owner).map(r=>({
+      id:uid("i_"), name:r.name+" #1", type:r.key, owner:r.owner,
+    }));
+    if(!db.items.length) db.items = seed().items.filter(i=>(db.resources||[]).some(r=>r.key===i.type));
+  }
+  (db.resources||[]).forEach(r=>{ delete r.owner; });
+  // any grant still referencing the removed "prod" condition becomes a plain allow
+  (db.roles||[]).forEach(role=>{
+    for(const k in (role.grants||{})) if(role.grants[k]==="prod") role.grants[k]="allow";
+  });
+  return db;
+}
+function save() { localStorage.setItem("sentinel_db", JSON.stringify(DB)); }
+function uid(p){ return p + Math.random().toString(36).slice(2,8); }
+function toast(msg, ok){ const t=document.getElementById("toast"); t.textContent=msg; t.className="toast show"+(ok?" ok":""); setTimeout(()=>t.className="toast",1800); }
+
+/* ---------- Role resolution & permission engine ---------- */
+function roleById(id){ return DB.roles.find(r=>r.id===id); }
+function resByKey(k){ return DB.resources.find(r=>r.key===k); }
+function userById(id){ return DB.users.find(u=>u.id===id); }
+function itemById(id){ return (DB.items||[]).find(i=>i.id===id); }
+function itemsByType(typeKey){ return (DB.items||[]).filter(i=>i.type===typeKey); }
+
+// full ancestry chain of a role (self first, then parents)
+function roleChain(id){
+  const chain=[]; let cur=roleById(id); const seen=new Set();
+  while(cur && !seen.has(cur.id)){ seen.add(cur.id); chain.push(cur); cur=cur.parent?roleById(cur.parent):null; }
+  return chain;
+}
+
+// effective grants for a single role including inheritance.
+// returns map key -> {effect, source(roleName), inherited:bool}
+function effectiveRoleGrants(id){
+  const out={};
+  const chain=roleChain(id);
+  // walk from furthest ancestor to self so nearer roles override
+  for(let i=chain.length-1;i>=0;i--){
+    const r=chain[i];
+    for(const [k,eff] of Object.entries(r.grants||{})){
+      out[k]={ effect:eff, source:r.name, inherited: r.id!==id };
+    }
+  }
+  return out;
+}
+
+// effective grants for a USER across all roles. deny wins.
+function effectiveUserGrants(userId){
+  const u=userById(userId); const out={};
+  for(const rid of u.roles){
+    const g=effectiveRoleGrants(rid);
+    for(const [k,info] of Object.entries(g)){
+      if(out[k]){
+        if(info.effect==="deny") out[k]={...info, viaRole:roleById(rid).name};
+        else if(out[k].effect!=="deny") out[k]={...info, viaRole:roleById(rid).name};
+      } else out[k]={...info, viaRole:roleById(rid).name};
+    }
+  }
+  return out;
+}
+
+/* ---------- ABAC conditions ---------- */
+function condById(id){ return (DB.conditions||[]).find(c=>c.id===id); }
+// normalize a grant effect into its list of ABAC condition ids (null for allow/deny/empty).
+// a conditional grant is stored as an array of ids; legacy saves may store a single id string.
+function condIds(effect){
+  if(effect==="allow"||effect==="deny"||effect==null) return null;
+  return Array.isArray(effect) ? effect : [effect];
+}
+// label for any grant effect (built-in allow/deny or one-or-more ABAC conditions)
+function condLabel(effect){
+  if(effect==="allow") return "Always";
+  if(effect==="deny")  return "Explicit DENY";
+  const ids=condIds(effect)||[];
+  return ids.map(id=>{ const c=condById(id); return c?c.label:id; }).join(" + ") || String(effect);
+}
+// human-readable expression for a condition object
+function condExpr(c){
+  const op=(OPS[c.op]||{}).sym||c.op;
+  return `${c.left} ${op} ${c.rightType==="literal" ? `"${c.right}"` : c.right}`;
+}
+function fmtVal(v){ return (v==null||v==="") ? "∅" : v; }
+function applyOp(op,l,r){
+  switch(op){
+    case "eq":  return String(l)===String(r);
+    case "neq": return String(l)!==String(r);
+    case "gt":  return parseFloat(l)>parseFloat(r);
+    case "gte": return parseFloat(l)>=parseFloat(r);
+    case "lt":  return parseFloat(l)<parseFloat(r);
+    case "lte": return parseFloat(l)<=parseFloat(r);
+    case "in":  return String(r).split(",").map(s=>s.trim()).includes(String(l));
+    default:    return false;
+  }
+}
+// resolve the subject/resource/request attribute bag for a decision
+function buildAttrs(u, ctx){
+  return {
+    "subject.id":u.id, "subject.name":u.name, "subject.dept":u.dept, "subject.email":u.email,
+    "subject.clearance":u.clearance, "subject.region":u.region, "subject.status":u.status,
+    "resource.owner":ctx.owner, "resource.dept":ctx.resourceDept,
+    "resource.sensitivity":ctx.resourceSensitivity, "resource.region":ctx.resourceRegion,
+  };
+}
+// evaluate effect against an attribute bag -> {pass, reason}
+function evalCondition(effect, attrs){
+  if(effect==="allow") return {pass:true,  reason:"unconditional grant"};
+  if(effect==="deny")  return {pass:false, reason:"explicit deny rule"};
+  const c=condById(effect);
+  if(!c) return {pass:false, reason:"unknown condition"};
+  const lv=attrs[c.left];
+  const rv=c.rightType==="literal" ? c.right : attrs[c.right];
+  const pass=applyOp(c.op, lv, rv);
+  const detail=`${fmtVal(lv)} ${(OPS[c.op]||{}).sym||c.op} ${fmtVal(rv)}`;
+  return {pass, reason:`${pass?"condition met":"condition not met"}: ${condExpr(c)} → ${detail}`};
+}
+
+// full decision with trace
+function decide(userId, resKey, action, ctx){
+  const trace=[]; const u=userById(userId);
+  const key=resKey+":"+action;
+  trace.push({k:"info",t:`Subject: ${u.name}`, d:`Department: ${u.dept} · Roles: ${u.roles.map(r=>roleById(r).name).join(", ")}`});
+
+  // expand roles
+  const allRoles=new Set();
+  u.roles.forEach(rid=>roleChain(rid).forEach(r=>allRoles.add(r.name)));
+  trace.push({k:"info",t:`Resolved role hierarchy`, d:`Effective roles (incl. inherited): ${[...allRoles].join(", ")}`});
+
+  const grants=effectiveUserGrants(userId);
+  const match=grants[key];
+
+  if(!match){
+    trace.push({k:"no",t:`No grant for ${key}`, d:`Default-deny: no role grants ${action} on ${resByKey(resKey)?.name||resKey}.`});
+    return {allow:false, trace, reason:"No matching permission (default deny)"};
+  }
+
+  trace.push({k:"info",t:`Matched grant`, d:`Rule “${condLabel(match.effect)}” via role ${match.viaRole}${match.inherited?` (inherited from ${match.source})`:""}.`});
+
+  if(match.effect==="deny"){
+    trace.push({k:"no",t:`Explicit DENY`, d:`A deny rule overrides any allow. Access blocked.`});
+    return {allow:false, trace, reason:"Explicit deny rule takes precedence"};
+  }
+
+  if(match.effect==="allow"){
+    trace.push({k:"ok",t:`Unconditional allow`, d:`Permission granted directly.`});
+    trace.push({k:"ok",t:`Access ALLOWED`, d:`All checks passed for ${action} on ${resByKey(resKey)?.name}.`});
+    return {allow:true, trace, reason:"unconditional grant"};
+  }
+
+  // conditional grant: every assigned ABAC condition must pass (AND)
+  const attrs=buildAttrs(u, ctx);
+  const ids=condIds(match.effect)||[];
+  let allPass=true, firstFail=null;
+  for(const id of ids){
+    const c=evalCondition(id, attrs);
+    trace.push({k: c.pass?"ok":"warn", t:`ABAC condition: ${condLabel(id)}`, d:(c.pass?"✔ ":"✘ ")+c.reason+"."});
+    if(!c.pass && allPass){ allPass=false; firstFail=c.reason; }
+  }
+
+  if(allPass){
+    const reason= ids.length>1 ? `all ${ids.length} conditions met` : (ids.length?`condition met`:"granted");
+    trace.push({k:"ok",t:`Access ALLOWED`, d:`${ids.length>1?`All ${ids.length} conditions`:"Condition"} passed for ${action} on ${resByKey(resKey)?.name}.`});
+    return {allow:true, trace, reason};
+  }
+  trace.push({k:"no",t:`Access DENIED`, d:`Condition not satisfied: ${firstFail}.`});
+  return {allow:false, trace, reason: ids.length>1 ? `not all conditions met (${firstFail})` : firstFail};
+}
+
+/* ---------- Rendering: Config ---------- */
+function renderStats(){
+  const el=document.getElementById("statRow");
+  const grantCount=DB.roles.reduce((a,r)=>a+Object.keys(r.grants||{}).length,0);
+  el.innerHTML=[
+    ["Roles",DB.roles.length,"var(--accent)"],
+    ["Users",DB.users.length,"var(--purple)"],
+    ["Resource types",DB.resources.length,"var(--green)"],
+    ["Resource items",(DB.items||[]).length,"var(--green)"],
+    ["ABAC conditions",(DB.conditions||[]).length,"var(--amber)"],
+    ["Active grants",grantCount,"var(--text)"],
+  ].map(([l,n,c])=>`<div class="stat"><div class="n" style="color:${c}">${n}</div><div class="l">${l}</div></div>`).join("");
+}
+
+function renderRoleList(){
+  const el=document.getElementById("roleTable");
+  document.getElementById("roleCount").textContent=DB.roles.length+" total";
+  el.innerHTML=`<thead><tr><th>Role</th><th>Inherits from</th><th>Description</th><th style="text-align:center">Grants</th></tr></thead><tbody>`+
+    DB.roles.map(r=>{
+      const gc=Object.keys(r.grants||{}).length;
+      const parent=r.parent?roleById(r.parent):null;
+      return `<tr class="clickable ${r.id===selectedRoleId?"active":""}" data-role="${r.id}">
+        <td><span class="idot" style="background:${r.parent?'var(--purple)':'var(--accent)'}"></span><b>${esc(r.name)}</b></td>
+        <td>${parent?`<span class="tag role">${esc(parent.name)}</span>`:`<span style="color:var(--muted-2)">—</span>`}</td>
+        <td style="color:var(--muted)">${esc(r.desc||"")}</td>
+        <td style="text-align:center"><span class="count">${gc}</span></td>
+      </tr>`;
+    }).join("")+`</tbody>`;
+  el.querySelectorAll("tr.clickable").forEach(n=>n.onclick=()=>{ selectedRoleId=n.dataset.role; renderRoleList(); renderMatrix(); });
+}
+
+function renderUserList(){
+  const el=document.getElementById("userTable");
+  el.innerHTML=`<thead><tr><th>User</th><th>Email</th><th>Department</th><th style="text-align:center">Clr.</th><th>Region</th><th>Status</th><th>Roles</th><th class="actcell"></th></tr></thead><tbody>`+
+    DB.users.map(u=>`<tr>
+      <td><span class="idot" style="background:var(--purple)"></span><b>${esc(u.name)}</b></td>
+      <td class="mono" style="color:var(--muted)">${esc(u.email||"—")}</td>
+      <td>${esc(u.dept)}</td>
+      <td style="text-align:center">${esc(u.clearance!=null?String(u.clearance):"—")}</td>
+      <td>${esc(u.region||"—")}</td>
+      <td>${u.status&&u.status!=="active"?`<span class="tag" style="color:var(--red);border-color:var(--red)33">${esc(u.status)}</span>`:`<span style="color:var(--green)">active</span>`}</td>
+      <td>${u.roles.map(r=>`<span class="tag role">${esc(roleById(r)?.name||"?")}</span>`).join("")||`<span style="color:var(--muted-2)">—</span>`}</td>
+      <td class="actcell"><button class="btn sm ghost" data-edituser="${u.id}">✎</button></td>
+    </tr>`).join("")+`</tbody>`;
+  el.querySelectorAll("[data-edituser]").forEach(b=>b.onclick=()=>editUser(b.dataset.edituser));
+}
+
+function renderMatrix(){
+  const role=roleById(selectedRoleId);
+  document.getElementById("matrixTitle").textContent=`Permission Matrix — ${role.name}`;
+  const eff=effectiveRoleGrants(role.id);
+  const parent=role.parent?roleById(role.parent):null;
+  const ancestors=roleChain(role.id).slice(1).map(r=>r.name);
+  const inheritStr=ancestors.length
+    ? `Inheritance: ${ancestors.map(c=>`<span class="tag">${esc(c)}</span>`).join(" → ")}`
+    : `<span class="tag" style="color:var(--muted)">Base role</span>`;
+  document.getElementById("roleInfoBar").innerHTML=
+    `<b style="color:var(--text)">${esc(role.name)}</b> &nbsp;·&nbsp; ${esc(role.desc||"")}
+     &nbsp;·&nbsp; ${inheritStr}`;
+
+  const filter=(document.getElementById("matrixFilter").value||"").toLowerCase();
+  const tbl=document.getElementById("matrix");
+  // group resources by domain
+  const domains={};
+  DB.resources.forEach(r=>{ (domains[r.domain]=domains[r.domain]||[]).push(r); });
+
+  let html=`<thead><tr><th class="resource-col">Resource</th>`+
+    ACTIONS_LIB.map(a=>`<th>${a}</th>`).join("")+`</tr></thead><tbody>`;
+
+  for(const [g,reslist] of Object.entries(domains)){
+    const visible=reslist.filter(r=>!filter || r.name.toLowerCase().includes(filter) || r.key.includes(filter) || r.actions.some(a=>a.includes(filter)));
+    if(!visible.length) continue;
+    html+=`<tr class="domain-row"><td colspan="${ACTIONS_LIB.length+1}">${esc(g)}</td></tr>`;
+    for(const res of visible){
+      html+=`<tr><td class="resource-col"><div class="rname">${esc(res.name)}</div><div class="rkey">${esc(res.key)}</div></td>`;
+      for(const act of ACTIONS_LIB){
+        if(!res.actions.includes(act)){ html+=`<td class="cell"><span style="color:var(--muted-2);opacity:.3">·</span></td>`; continue; }
+        const k=res.key+":"+act;
+        const own=role.grants&&role.grants[k];
+        const inh=eff[k]&&eff[k].inherited&&!own;
+        let cls="perm", label="", title="";
+        if(own){
+          if(own==="allow"){cls+=" on";label="✓";}
+          else if(own==="deny"){cls+=" cond";label="✕";title="Explicit deny";}
+          else {cls+=" cond";const n=(condIds(own)||[]).length;label=n>1?`◆${n}`:"◆";title="Conditional: "+condLabel(own);}
+        } else if(inh){
+          cls+=" inherited"; label="↑"; title="Inherited: "+condLabel(eff[k].effect)+" (from "+eff[k].source+")";
+        }
+        html+=`<td class="cell"><span class="${cls}" data-k="${k}" title="${title||(own?condLabel(own):'No access — click to grant')}">${label}</span></td>`;
+      }
+      html+=`</tr>`;
+    }
+  }
+  html+=`</tbody>`;
+  tbl.innerHTML=html;
+  tbl.querySelectorAll(".perm").forEach(p=>{
+    if(p.classList.contains("inherited")) return;
+    p.onclick=(e)=>{ e.stopPropagation(); openPermMenu(p, p.dataset.k); };
+  });
+}
+
+/* ---------- Permission cell popover: set effect + assign multiple ABAC conditions inline ---------- */
+let pmCellKey=null, pmAnchor=null;
+// switch a cell between the mutually-exclusive base modes: none / allow / deny
+function setCellMode(k, mode){
+  const role=roleById(selectedRoleId); role.grants=role.grants||{};
+  if(mode==="none") delete role.grants[k]; else role.grants[k]=mode;
+  save(); renderMatrix(); renderStats(); renderRoleList(); renderConditionsPanel(); renderPermMenu(false);
+}
+// add/remove one ABAC condition on a cell; multiple conditions AND together (all must pass)
+function toggleCellCond(k, id){
+  const role=roleById(selectedRoleId); role.grants=role.grants||{};
+  const ids=(condIds(role.grants[k])||[]).slice();
+  const i=ids.indexOf(id);
+  if(i>=0) ids.splice(i,1); else ids.push(id);
+  if(ids.length) role.grants[k]=ids; else delete role.grants[k];
+  save(); renderMatrix(); renderStats(); renderRoleList(); renderConditionsPanel(); renderPermMenu(false);
+}
+function permMenuHtml(cur){
+  const ids=condIds(cur)||[];
+  const mode=cur==="allow"?"allow":cur==="deny"?"deny":ids.length?"cond":"none";
+  const fixed=[
+    ["none","·","No access"],
+    ["allow","✓","Allow (always)"],
+    ["deny","✕","Deny"],
+  ].map(([val,dot,title])=>`<div class="opt" data-mode="${val}">
+      <span class="pmradio ${mode===val?"on":""}"></span>
+      <div class="pmtext"><div class="pmtitle">${dot} ${title}</div></div>
+    </div>`).join("");
+  const conds=DB.conditions||[];
+  const condRows=conds.length
+    ? conds.map(c=>{
+        const on=ids.includes(c.id);
+        return `<div class="opt" data-cond-eff="${c.id}">
+          <span class="pmcheck ${on?"on":""}">${on?"✓":""}</span>
+          <div class="pmtext"><div class="pmtitle">◆ ${esc(c.label)}</div><div class="pmexpr">${esc(condExpr(c))}</div></div>
+          <div class="pmacts">
+            <button class="icon pmedit" data-cond="${c.id}" title="Edit condition">✎</button>
+            <button class="icon pmdel" data-cond="${c.id}" title="Delete condition">🗑</button>
+          </div>
+        </div>`;
+      }).join("")
+    : `<div class="pmempty">No conditions yet.</div>`;
+  const note = ids.length>1 ? ` <span style="text-transform:none;font-weight:500;color:var(--muted-2)">· all must pass</span>` : "";
+  return fixed
+    + `<div class="pmsep">ABAC conditions${note}</div>` + condRows
+    + `<div class="pmdiv"></div>`
+    + `<div class="opt pmnew"><span style="width:16px;flex:none"></span><div class="pmtext"><div class="pmtitle">+ New condition…</div></div></div>`;
+}
+function openPermMenu(anchor, k){ pmCellKey=k; pmAnchor=anchor; renderPermMenu(true); }
+// (re)render the popover for the current cell; reposition only when first opened
+function renderPermMenu(reposition){
+  if(pmCellKey==null) return;
+  const role=roleById(selectedRoleId);
+  const cur=role.grants&&role.grants[pmCellKey];
+  const menu=document.getElementById("permMenu");
+  menu.innerHTML=permMenuHtml(cur);
+  menu.classList.add("open");
+  if(reposition && pmAnchor){
+    const r=pmAnchor.getBoundingClientRect();
+    const cw=document.documentElement.clientWidth, ch=document.documentElement.clientHeight;
+    let left=r.left+window.scrollX;
+    if(r.left+menu.offsetWidth > cw-8) left=window.scrollX+Math.max(8, cw-menu.offsetWidth-8);
+    let top=r.bottom+window.scrollY+4;
+    if(r.bottom+menu.offsetHeight > ch-8 && r.top-menu.offsetHeight > 8) top=r.top+window.scrollY-menu.offsetHeight-4;
+    menu.style.left=left+"px"; menu.style.top=top+"px";
+  }
+  // wire rows — popover stays open while toggling; outside-click / Esc dismisses
+  menu.querySelectorAll(".opt[data-mode]").forEach(o=>o.onclick=()=>setCellMode(pmCellKey,o.dataset.mode));
+  menu.querySelectorAll(".opt[data-cond-eff]").forEach(o=>o.onclick=()=>toggleCellCond(pmCellKey,o.dataset.condEff));
+  menu.querySelector(".pmnew").onclick=()=>{ const k=pmCellKey; closePermMenu(); addCondition(k); };
+  menu.querySelectorAll(".pmedit").forEach(b=>b.onclick=(e)=>{ e.stopPropagation(); const id=b.dataset.cond; closePermMenu(); editCondition(id); });
+  menu.querySelectorAll(".pmdel").forEach(b=>b.onclick=(e)=>{ e.stopPropagation(); deleteConditionInline(b.dataset.cond); });
+}
+function closePermMenu(){ pmCellKey=null; pmAnchor=null; document.getElementById("permMenu").classList.remove("open"); }
+function deleteConditionInline(id){
+  if(condInUse(id)) return toast("Condition is used by grants — clear those cells first");
+  DB.conditions=(DB.conditions||[]).filter(x=>x.id!==id);
+  save(); renderMatrix(); renderStats(); renderConditionsPanel(); renderPermMenu(false); toast("Condition deleted",true);
+}
+
+function esc(s){ return (s==null?"":String(s)).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+/* ---------- Modals ---------- */
+function openModal(title, bodyHtml, buttons){
+  document.getElementById("modalTitle").textContent=title;
+  document.getElementById("modalBody").innerHTML=bodyHtml;
+  const ft=document.getElementById("modalFoot"); ft.innerHTML="";
+  buttons.forEach(b=>{ const el=document.createElement("button"); el.className="btn "+(b.cls||""); el.textContent=b.label; el.onclick=b.on; ft.appendChild(el); });
+  document.getElementById("modalBack").classList.add("open");
+}
+function closeModal(){ document.getElementById("modalBack").classList.remove("open"); }
+document.getElementById("modalClose").onclick=closeModal;
+document.getElementById("modalBack").onclick=(e)=>{ if(e.target.id==="modalBack") closeModal(); };
+
+function roleFormHtml(r){
+  const opts=`<option value="">— none —</option>`+DB.roles.filter(x=>!r||x.id!==r.id).map(x=>`<option value="${x.id}" ${r&&r.parent===x.id?"selected":""}>${esc(x.name)}</option>`).join("");
+  return `<label class="field"><span>Role name</span><input type="text" id="f_rname" value="${r?esc(r.name):""}" placeholder="e.g. Regional Manager"></label>
+    <label class="field"><span>Description</span><input type="text" id="f_rdesc" value="${r?esc(r.desc||""):""}" placeholder="Short description"></label>
+    <label class="field"><span>Inherits from (parent role)</span><select id="f_rparent">${opts}</select></label>
+    <p class="hint">A child role automatically receives all of its parent's grants. Closer roles override ancestors; an explicit <b>deny</b> always wins.</p>`;
+}
+function addRole(){
+  openModal("New Role", roleFormHtml(null), [
+    {label:"Cancel", cls:"ghost", on:closeModal},
+    {label:"Create role", cls:"primary", on:()=>{
+      const name=document.getElementById("f_rname").value.trim(); if(!name) return toast("Name required");
+      DB.roles.push({id:uid("r_"),name,desc:document.getElementById("f_rdesc").value.trim(),parent:document.getElementById("f_rparent").value||null,grants:{}});
+      save(); closeModal(); renderAll(); toast("Role created",true);
+    }}]);
+}
+function editRole(){
+  const r=roleById(selectedRoleId);
+  openModal("Edit Role", roleFormHtml(r), [
+    {label:"Cancel", cls:"ghost", on:closeModal},
+    {label:"Save", cls:"primary", on:()=>{
+      r.name=document.getElementById("f_rname").value.trim()||r.name;
+      r.desc=document.getElementById("f_rdesc").value.trim();
+      const p=document.getElementById("f_rparent").value||null;
+      // prevent cycle
+      if(p){ let c=roleById(p), seen=new Set(); while(c){ if(c.id===r.id){toast("Cannot create circular inheritance");return;} seen.add(c.id); c=c.parent?roleById(c.parent):null; if(seen.has(c?.id))break; } }
+      r.parent=p; save(); closeModal(); renderAll(); toast("Role updated",true);
+    }}]);
+}
+function delRole(){
+  const r=roleById(selectedRoleId);
+  if(DB.users.some(u=>u.roles.includes(r.id))) return toast("Role is assigned to users — unassign first");
+  if(DB.roles.some(x=>x.parent===r.id)) return toast("Other roles inherit from this one");
+  openModal("Delete role?", `<p>Delete <b>${esc(r.name)}</b> and its ${Object.keys(r.grants||{}).length} grants? This cannot be undone.</p>`,[
+    {label:"Cancel",cls:"ghost",on:closeModal},
+    {label:"Delete",cls:"danger",on:()=>{ DB.roles=DB.roles.filter(x=>x.id!==r.id); selectedRoleId=DB.roles[0]?.id; save(); closeModal(); renderAll(); toast("Role deleted",true); }}]);
+}
+
+function userFormHtml(u){
+  const roleChks=DB.roles.map(r=>`<label class="chk"><input type="checkbox" value="${r.id}" ${u&&u.roles.includes(r.id)?"checked":""}> ${esc(r.name)}</label>`).join("");
+  const statusOpts=["active","suspended","on_leave"].map(s=>`<option value="${s}" ${u&&u.status===s?"selected":""}>${s}</option>`).join("");
+  return `<label class="field"><span>Full name</span><input type="text" id="f_uname" value="${u?esc(u.name):""}"></label>
+    <div class="row"><label class="field" style="flex:1"><span>Email</span><input type="text" id="f_uemail" value="${u?esc(u.email):""}"></label>
+    <label class="field" style="flex:1"><span>Department</span><input type="text" id="f_udept" value="${u?esc(u.dept):""}"></label></div>
+    <div class="row"><label class="field" style="flex:1"><span>Clearance (1–5)</span><input type="number" id="f_uclr" min="1" max="5" value="${u&&u.clearance!=null?esc(String(u.clearance)):"1"}"></label>
+    <label class="field" style="flex:1"><span>Data region</span><input type="text" id="f_uregion" value="${u?esc(u.region||""):""}" placeholder="e.g. US"></label>
+    <label class="field" style="flex:1"><span>Status</span><select id="f_ustatus">${statusOpts}</select></label></div>
+    <label class="field"><span>Assigned roles</span></label><div class="checks" id="f_uroles">${roleChks}</div>`;
+}
+function addUser(){
+  openModal("New User", userFormHtml(null),[
+    {label:"Cancel",cls:"ghost",on:closeModal},
+    {label:"Create",cls:"primary",on:()=>{
+      const name=document.getElementById("f_uname").value.trim(); if(!name)return toast("Name required");
+      const roles=[...document.querySelectorAll("#f_uroles input:checked")].map(c=>c.value);
+      DB.users.push({id:uid("u_"),name,email:document.getElementById("f_uemail").value.trim(),dept:document.getElementById("f_udept").value.trim()||"—",
+        clearance:parseInt(document.getElementById("f_uclr").value,10)||1,region:document.getElementById("f_uregion").value.trim(),status:document.getElementById("f_ustatus").value,roles});
+      save(); closeModal(); renderAll(); toast("User created",true);
+    }}]);
+}
+function editUser(id){
+  const u=userById(id);
+  openModal("Edit User", userFormHtml(u),[
+    {label:"Delete",cls:"danger",on:()=>{ DB.users=DB.users.filter(x=>x.id!==id); save(); closeModal(); renderAll(); toast("User deleted",true); }},
+    {label:"Cancel",cls:"ghost",on:closeModal},
+    {label:"Save",cls:"primary",on:()=>{
+      u.name=document.getElementById("f_uname").value.trim()||u.name;
+      u.email=document.getElementById("f_uemail").value.trim();
+      u.dept=document.getElementById("f_udept").value.trim()||"—";
+      u.clearance=parseInt(document.getElementById("f_uclr").value,10)||1;
+      u.region=document.getElementById("f_uregion").value.trim();
+      u.status=document.getElementById("f_ustatus").value;
+      u.roles=[...document.querySelectorAll("#f_uroles input:checked")].map(c=>c.value);
+      save(); closeModal(); renderAll(); toast("User updated",true);
+    }}]);
+}
+
+function renderResources(){
+  const el=document.getElementById("resTable");
+  if(!el)return;
+  el.innerHTML = DB.resources.length
+    ? `<thead><tr><th>Type</th><th>Key</th><th>Domain</th><th>Dept</th><th style="text-align:center">Sens.</th><th>Region</th><th style="text-align:center">Items</th><th>Actions</th><th class="actcell"></th></tr></thead><tbody>`+
+      DB.resources.map(r=>{
+        const itemCount=itemsByType(r.key).length;
+        return `<tr>
+          <td><span class="idot" style="background:var(--accent)"></span><b>${esc(r.name)}</b></td>
+          <td class="mono" style="color:var(--muted-2)">${esc(r.key)}</td>
+          <td>${esc(r.domain||"—")}</td>
+          <td>${esc(r.dept||"—")}</td>
+          <td style="text-align:center">${esc(r.sensitivity!=null?String(r.sensitivity):"—")}</td>
+          <td>${esc(r.region||"—")}</td>
+          <td style="text-align:center"><span class="count">${itemCount}</span></td>
+          <td>${r.actions.map(a=>`<span class="tag">${esc(a)}</span>`).join("")}</td>
+          <td class="actcell"><button class="btn sm ghost" data-editres="${esc(r.key)}">✎</button></td>
+        </tr>`;
+      }).join("")+`</tbody>`
+    : `<tbody><tr><td class="empty">No resource types defined.</td></tr></tbody>`;
+  el.querySelectorAll("[data-editres]").forEach(b=>b.onclick=()=>openResource(resByKey(b.dataset.editres)));
+}
+function addResource(){ openResource(null); }
+function openResource(res){
+  const actChks=ACTIONS_LIB.map(a=>`<label class="chk"><input type="checkbox" value="${a}" ${(res?res.actions.includes(a):["read","list"].includes(a))?"checked":""}> ${a}</label>`).join("");
+  const domainOpts=DOMAINS.map(d=>`<option value="${esc(d)}" ${res&&res.domain===d?"selected":""}>${esc(d)}</option>`).join("");
+  openModal(res?"Edit Resource Type":"New Resource Type", `
+    <label class="field"><span>Display name</span><input type="text" id="f_resname" value="${res?esc(res.name):""}" placeholder="e.g. Support Tickets"></label>
+    <div class="row"><label class="field" style="flex:1"><span>Key</span><input type="text" id="f_reskey" value="${res?esc(res.key):""}" placeholder="support.ticket" class="mono" ${res?"disabled":""}></label>
+    <label class="field" style="flex:1"><span>Domain</span><select id="f_resdomain">${domainOpts}</select></label></div>
+    <div class="row"><label class="field" style="flex:1"><span>Department</span><input type="text" id="f_resdept" value="${res?esc(res.dept||""):""}" placeholder="e.g. Sales"></label>
+    <label class="field" style="flex:1"><span>Sensitivity (1–5)</span><input type="number" id="f_ressens" min="1" max="5" value="${res&&res.sensitivity!=null?esc(String(res.sensitivity)):"1"}"></label>
+    <label class="field" style="flex:1"><span>Data region</span><input type="text" id="f_resregion" value="${res?esc(res.region||""):""}" placeholder="e.g. US"></label></div>
+    <label class="field"><span>Actions</span></label><div class="checks" id="f_resact">${actChks}</div>
+    <p class="hint">A type has no owner — owners are set per resource item. Sensitivity &amp; region feed the clearance and data-residency ABAC conditions.</p>`,[
+    {label:"Cancel",cls:"ghost",on:closeModal},
+    ...(res?[{label:"Delete",cls:"danger",on:()=>{
+      DB.resources=DB.resources.filter(x=>x.key!==res.key);
+      DB.items=(DB.items||[]).filter(i=>i.type!==res.key); // drop orphaned items
+      save(); closeModal(); renderAll(); toast("Resource type deleted"); }}]:[]),
+    {label:res?"Save":"Create",cls:"primary",on:()=>{
+      const name=document.getElementById("f_resname").value.trim();
+      const key=res?res.key:document.getElementById("f_reskey").value.trim();
+      if(!name||!key)return toast("Name and key required");
+      if(!res&&resByKey(key))return toast("Key already exists");
+      const actions=[...document.querySelectorAll("#f_resact input:checked")].map(c=>c.value);
+      if(!actions.length)return toast("Pick at least one action");
+      const dept=document.getElementById("f_resdept").value.trim();
+      const domain=document.getElementById("f_resdomain").value;
+      const sensitivity=parseInt(document.getElementById("f_ressens").value,10)||1;
+      const region=document.getElementById("f_resregion").value.trim();
+      if(res){ Object.assign(res,{name,domain,dept,sensitivity,region,actions}); }
+      else DB.resources.push({key,name,domain,dept,sensitivity,region,actions});
+      save(); closeModal(); renderAll(); toast(res?"Resource type updated":"Resource type added",true);
+    }}]);
+}
+
+/* ---------- Resource items (instances of a type; owner lives here) ---------- */
+function renderItems(){
+  const el=document.getElementById("itemTable");
+  if(!el)return;
+  const allItems=DB.items||[];
+  // populate the type filter, preserving the current selection if it still exists
+  const flt=document.getElementById("itemTypeFilter");
+  const prev=flt.value;
+  flt.innerHTML=`<option value="">All types</option>`+
+    DB.resources.map(r=>`<option value="${esc(r.key)}">${esc(r.name)} (${esc(r.key)})</option>`).join("");
+  if(prev && [...flt.options].some(o=>o.value===prev)) flt.value=prev;
+  const typeFilter=flt.value;
+  const items=typeFilter ? allItems.filter(i=>i.type===typeFilter) : allItems;
+  const cnt=document.getElementById("itemFilterCount");
+  if(cnt) cnt.textContent=typeFilter ? `${items.length} of ${allItems.length} shown` : "";
+  el.innerHTML = items.length
+    ? `<thead><tr><th>Item</th><th>Resource type</th><th>Owner</th><th class="actcell"></th></tr></thead><tbody>`+
+      items.map(it=>{
+        const res=resByKey(it.type); const own=userById(it.owner);
+        return `<tr>
+          <td><span class="idot" style="background:var(--green)"></span><b>${esc(it.name)}</b></td>
+          <td>${esc(res?res.name:it.type)} <span class="mono" style="color:var(--muted-2)">${esc(it.type)}</span></td>
+          <td>${esc(own?own.name:"—")}</td>
+          <td class="actcell"><button class="btn sm ghost" data-edititem="${esc(it.id)}">✎</button></td>
+        </tr>`;
+      }).join("")+`</tbody>`
+    : `<tbody><tr><td class="empty">${typeFilter?"No items of this type.":"No resource items defined."}</td></tr></tbody>`;
+  el.querySelectorAll("[data-edititem]").forEach(b=>b.onclick=()=>openItem(itemById(b.dataset.edititem)));
+}
+function addItem(){
+  if(!DB.resources.length) return toast("Create a resource type first");
+  openItem(null);
+}
+function openItem(it){
+  const typeOpts=DB.resources.map(r=>`<option value="${esc(r.key)}" ${it&&it.type===r.key?"selected":""}>${esc(r.name)} (${esc(r.key)})</option>`).join("");
+  const ownerOpts=`<option value="">— none —</option>`+DB.users.map(u=>`<option value="${u.id}" ${it&&it.owner===u.id?"selected":""}>${esc(u.name)}</option>`).join("");
+  openModal(it?"Edit Resource Item":"New Resource Item", `
+    <label class="field"><span>Display name</span><input type="text" id="f_itname" value="${it?esc(it.name):""}" placeholder="e.g. INV-1003 · Initech"></label>
+    <label class="field"><span>Resource type</span><select id="f_ittype">${typeOpts}</select></label>
+    <label class="field"><span>Owner</span><select id="f_itowner">${ownerOpts}</select></label>
+    <p class="hint">The owner is the subject matched by the <b>If owner</b> ABAC condition when this item is the request target.</p>`,[
+    {label:"Cancel",cls:"ghost",on:closeModal},
+    ...(it?[{label:"Delete",cls:"danger",on:()=>{ DB.items=DB.items.filter(x=>x.id!==it.id); save(); closeModal(); renderAll(); toast("Resource item deleted"); }}]:[]),
+    {label:it?"Save":"Create",cls:"primary",on:()=>{
+      const name=document.getElementById("f_itname").value.trim();
+      const type=document.getElementById("f_ittype").value;
+      if(!name||!type)return toast("Name and type required");
+      const owner=document.getElementById("f_itowner").value;
+      if(it){ Object.assign(it,{name,type,owner}); }
+      else { DB.items=DB.items||[]; DB.items.push({id:uid("i_"),name,type,owner}); }
+      save(); closeModal(); renderAll(); toast(it?"Resource item updated":"Resource item added",true);
+    }}]);
+}
+
+/* ---------- ABAC condition management (assigned inline via the matrix popover) ---------- */
+// the read-only list shown below the matrix; create/edit/delete also reachable here
+function renderConditionsPanel(){
+  const el=document.getElementById("condTable"); if(!el) return;
+  const conds=DB.conditions||[];
+  const cnt=document.getElementById("condPanelCount"); if(cnt) cnt.textContent=conds.length+" total";
+  el.innerHTML = conds.length
+    ? `<thead><tr><th>Condition</th><th>Expression</th><th style="text-align:center">In use</th><th class="actcell"></th></tr></thead><tbody>`+
+      conds.map(c=>`<tr>
+        <td><span class="idot" style="background:var(--amber)"></span><b>◆ ${esc(c.label)}</b></td>
+        <td class="mono" style="color:var(--muted)">${esc(condExpr(c))}</td>
+        <td style="text-align:center"><span class="count">${grantUseCount(c.id)}</span></td>
+        <td class="actcell"><button class="btn sm ghost" data-editcond="${c.id}">✎</button></td>
+      </tr>`).join("")+`</tbody>`
+    : `<tbody><tr><td class="empty">No conditions defined. Click <b>+ Condition</b>, or a matrix cell, to create one.</td></tr></tbody>`;
+  el.querySelectorAll("[data-editcond]").forEach(b=>b.onclick=()=>editCondition(b.dataset.editcond));
+}
+// is a condition assigned to any grant?
+function condInUse(id){ return grantUseCount(id)>0; }
+// how many grants (across all roles) reference this condition
+function grantUseCount(id){
+  let n=0;
+  DB.roles.forEach(r=>Object.values(r.grants||{}).forEach(eff=>{ const ids=condIds(eff); if(ids&&ids.includes(id)) n++; }));
+  return n;
+}
+
+function condFormHtml(c){
+  const attrOpts=(sel)=>ATTRS.map(a=>`<option value="${a.key}" ${sel===a.key?"selected":""}>${esc(a.key)}</option>`).join("");
+  const opOpts=Object.entries(OPS).map(([k,o])=>`<option value="${k}" ${c&&c.op===k?"selected":""}>${esc(o.sym)}  ${esc(o.label)}</option>`).join("");
+  const rt=c?c.rightType:"attr";
+  return `<label class="field"><span>Label</span><input type="text" id="f_clabel" value="${c?esc(c.label):""}" placeholder="e.g. Senior staff only"></label>
+    <label class="field"><span>Subject / resource / request attribute</span><select id="f_cleft">${attrOpts(c?c.left:"subject.dept")}</select></label>
+    <label class="field"><span>Operator</span><select id="f_cop">${opOpts}</select></label>
+    <label class="field"><span>Compare against</span><select id="f_crighttype">
+      <option value="attr" ${rt==="attr"?"selected":""}>Another attribute</option>
+      <option value="literal" ${rt==="literal"?"selected":""}>A literal value</option></select></label>
+    <label class="field" id="f_crightattr_w"><span>Right attribute</span><select id="f_crightattr">${attrOpts(c&&c.rightType==="attr"?c.right:"resource.dept")}</select></label>
+    <label class="field" id="f_crightlit_w"><span>Literal value</span><input type="text" id="f_crightlit" value="${c&&c.rightType==="literal"?esc(c.right):""}" placeholder="e.g. prod"></label>
+    <p class="hint">The rule passes when <b>attribute</b> <b>operator</b> <b>value</b> holds for the request. Numeric operators parse both sides as numbers; <b>∈</b> matches against a comma-separated list.</p>`;
+}
+// toggle attribute vs literal inputs after the modal renders
+function condFormWire(){
+  const t=document.getElementById("f_crighttype");
+  const upd=()=>{ const lit=t.value==="literal";
+    document.getElementById("f_crightattr_w").style.display=lit?"none":"";
+    document.getElementById("f_crightlit_w").style.display=lit?"":"none"; };
+  t.onchange=upd; upd();
+}
+function readCondForm(existing){
+  const label=document.getElementById("f_clabel").value.trim();
+  if(!label){ toast("Label required"); return null; }
+  const rightType=document.getElementById("f_crighttype").value;
+  const right=rightType==="literal"
+    ? document.getElementById("f_crightlit").value.trim()
+    : document.getElementById("f_crightattr").value;
+  if(rightType==="literal" && !right){ toast("Literal value required"); return null; }
+  return { id: existing?existing.id:uid("c_"), label,
+    left:document.getElementById("f_cleft").value,
+    op:document.getElementById("f_cop").value, rightType, right };
+}
+// assignToKey (optional): when created from a matrix cell, assign the new condition to that grant
+function addCondition(assignToKey){
+  openModal("New Condition", condFormHtml(null),[
+    {label:"Cancel",cls:"ghost",on:closeModal},
+    {label:"Create",cls:"primary",on:()=>{ const c=readCondForm(null); if(!c)return;
+      DB.conditions=DB.conditions||[]; DB.conditions.push(c);
+      if(typeof assignToKey==="string"){ const role=roleById(selectedRoleId); role.grants=role.grants||{};
+        const ids=(condIds(role.grants[assignToKey])||[]).slice(); ids.push(c.id); role.grants[assignToKey]=ids; }
+      save(); closeModal(); renderAll(); toast(assignToKey?"Condition created & assigned":"Condition created",true); }}]);
+  condFormWire();
+}
+function editCondition(id){
+  const c=condById(id); if(!c)return;
+  openModal("Edit Condition", condFormHtml(c),[
+    {label:"Delete",cls:"danger",on:()=>{
+      if(condInUse(id)) return toast("Condition is used by grants — clear those cells first");
+      DB.conditions=DB.conditions.filter(x=>x.id!==id);
+      save(); closeModal(); renderAll(); toast("Condition deleted",true); }},
+    {label:"Cancel",cls:"ghost",on:closeModal},
+    {label:"Save",cls:"primary",on:()=>{ const upd=readCondForm(c); if(!upd)return;
+      Object.assign(c,upd); save(); closeModal(); renderAll(); toast("Condition updated",true); }}]);
+  condFormWire();
+}
+
+/* ---------- Playground ---------- */
+// repopulate a <select> but keep the current selection if it still exists
+function setOptions(el,html,prev){
+  el.innerHTML=html;
+  if(prev!=null && [...el.options].some(o=>o.value===prev)) el.value=prev;
+}
+function fillPlaygroundSelectors(){
+  const u=document.getElementById("pgUser");
+  setOptions(u,DB.users.map(x=>`<option value="${x.id}">${esc(x.name)} — ${esc(x.dept)}</option>`).join(""),u.value);
+  fillResActions();
+}
+function fillResActions(){
+  const r=document.getElementById("pgRes");
+  setOptions(r,DB.resources.map(x=>`<option value="${x.key}">${esc(x.domain)} / ${esc(x.name)}</option>`).join(""),r.value);
+  fillItems(); fillActions();
+}
+// items of the selected resource type; the chosen item supplies resource.owner
+function fillItems(){
+  const sel=document.getElementById("pgItem");
+  const items=itemsByType(document.getElementById("pgRes").value);
+  setOptions(sel,items.length?items.map(i=>`<option value="${esc(i.id)}">${esc(i.name)}</option>`).join(""):`<option value="">— no items —</option>`,sel.value);
+  updateCtxHint();
+}
+function fillActions(){
+  const res=resByKey(document.getElementById("pgRes").value);
+  const a=document.getElementById("pgAction");
+  setOptions(a,(res?res.actions:[]).map(x=>`<option value="${x}">${x}</option>`).join(""),a.value);
+  updateCtxHint();
+}
+// show the attributes the request will be evaluated against: item owner + type dept
+function updateCtxHint(){
+  const el=document.getElementById("pgCtxHint"); if(!el)return;
+  const res=resByKey(document.getElementById("pgRes").value);
+  if(!res){ el.innerHTML=""; return; }
+  const it=itemById(document.getElementById("pgItem").value);
+  const own=it?userById(it.owner):null;
+  el.innerHTML=`Context: item <b>${esc(it?it.name:"—")}</b> · owner <b>${esc(own?own.name:"—")}</b> · type dept <b>${esc(res.dept||"—")}</b> · sensitivity <b>${esc(res.sensitivity!=null?String(res.sensitivity):"—")}</b> · region <b>${esc(res.region||"—")}</b>`;
+}
+function runPlayground(){
+  const userId=document.getElementById("pgUser").value;
+  const resKey=document.getElementById("pgRes").value;
+  const action=document.getElementById("pgAction").value;
+  const res0=resByKey(resKey);
+  const item=itemById(document.getElementById("pgItem").value);
+  const ctx={
+    owner:item?item.owner:"",
+    resourceDept:res0?res0.dept:"",
+    resourceSensitivity:res0?res0.sensitivity:"",
+    resourceRegion:res0?res0.region:"",
+  };
+  const res=decide(userId,resKey,action,ctx);
+  const v=document.getElementById("verdict");
+  v.className="verdict "+(res.allow?"allow":"deny");
+  v.innerHTML=`<div class="big">${res.allow?"✓ ALLOW":"✕ DENY"}</div>
+    <div class="sub"><span class="mono">${esc(userById(userId).name)}</span> → <span class="mono">${esc(action)}</span> on <span class="mono">${esc(resByKey(resKey).name)}</span> · ${esc(res.reason)}</div>`;
+  const tr=document.getElementById("trace");
+  tr.innerHTML=res.trace.map((s,i)=>`<li><div class="ic ${s.k==='ok'?'ok':s.k==='no'?'no':s.k==='warn'?'warn':'info'}">${i+1}</div>
+    <div class="body"><div class="t">${esc(s.t)}</div><div class="d">${esc(s.d)}</div></div></li>`).join("");
+  renderEffective(userId);
+}
+function renderEffective(userId){
+  const grants=effectiveUserGrants(userId);
+  document.getElementById("effSub").textContent="for "+userById(userId).name;
+  const el=document.getElementById("effPerms");
+  const entries=Object.entries(grants);
+  if(!entries.length){ el.innerHTML=`<p class="empty">This user has no grants.</p>`; return; }
+  // group by resource
+  const byRes={};
+  entries.forEach(([k,info])=>{ const [rk,act]=k.split(":"); (byRes[rk]=byRes[rk]||[]).push({act,info}); });
+  el.innerHTML=Object.entries(byRes).map(([rk,list])=>{
+    const res=resByKey(rk);
+    return `<div style="margin-bottom:12px"><div style="font-weight:600;font-size:13px;margin-bottom:5px">${esc(res?res.name:rk)} <span class="rkey mono" style="color:var(--muted-2);font-weight:400">${esc(rk)}</span></div>
+      ${list.map(({act,info})=>{
+        const deny=info.effect==="deny";
+        const color=deny?"var(--red)":info.effect==="allow"?"var(--green)":"var(--amber)";
+        return `<span class="tag" style="border-color:${color}33"><b style="color:${color}">${esc(act)}</b> · ${esc(condLabel(info.effect))}${info.inherited?` <span style="color:var(--muted-2)">↑${esc(info.source)}</span>`:""}</span>`;
+      }).join("")}</div>`;
+  }).join("");
+}
+
+/* ---------- Tabs & wiring ---------- */
+function switchView(name){
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.view===name));
+  document.getElementById("view-config").classList.toggle("active",name==="config");
+  document.getElementById("view-play").classList.toggle("active",name==="play");
+  if(name==="play"){ fillPlaygroundSelectors(); renderEffective(document.getElementById("pgUser").value); }
+}
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>switchView(t.dataset.view));
+
+/* Configuration sub-tabs */
+function switchSub(name){
+  document.querySelectorAll("#cfgSubtabs .subtab").forEach(t=>t.classList.toggle("active",t.dataset.sub===name));
+  document.querySelectorAll("#view-config .subview").forEach(v=>v.classList.toggle("active",v.id==="sub-"+name));
+}
+document.querySelectorAll("#cfgSubtabs .subtab").forEach(t=>t.onclick=()=>switchSub(t.dataset.sub));
+
+/* Collapse / expand the cards in the Roles & Permissions sub-tab */
+document.querySelectorAll("#sub-roles .card.collapsible > .hd .chev").forEach(ch=>{
+  ch.onclick=()=>ch.closest(".card").classList.toggle("collapsed");
+});
+document.getElementById("collapseRolesBtn").onclick=()=>document.querySelectorAll("#sub-roles .card.collapsible").forEach(c=>c.classList.add("collapsed"));
+document.getElementById("expandRolesBtn").onclick=()=>document.querySelectorAll("#sub-roles .card.collapsible").forEach(c=>c.classList.remove("collapsed"));
+document.getElementById("addRoleBtn").onclick=addRole;
+document.getElementById("editRoleBtn").onclick=editRole;
+document.getElementById("delRoleBtn").onclick=delRole;
+document.getElementById("addUserBtn").onclick=addUser;
+document.getElementById("addResBtn").onclick=addResource;
+document.getElementById("addItemBtn").onclick=addItem;
+document.getElementById("addCondBtn").onclick=()=>addCondition();
+document.getElementById("matrixFilter").oninput=renderMatrix;
+document.getElementById("itemTypeFilter").onchange=renderItems;
+document.getElementById("pgRes").onchange=()=>{ fillItems(); fillActions(); };
+document.getElementById("pgItem").onchange=updateCtxHint;
+document.getElementById("pgUser").onchange=()=>renderEffective(document.getElementById("pgUser").value);
+document.getElementById("pgRun").onclick=runPlayground;
+document.getElementById("resetBtn").onclick=()=>{
+  openModal("Reset everything?", "<p>Discard all changes and restore the seed dataset?</p>",[
+    {label:"Cancel",cls:"ghost",on:closeModal},
+    {label:"Reset",cls:"danger",on:()=>{ DB=seed(); selectedRoleId=DB.roles[0].id; save(); closeModal(); renderAll(); toast("Reset to seed data",true); }}]);
+};
+
+// keep clicks inside the popover from bubbling to the outside-click dismiss handler
+document.getElementById("permMenu").onclick=(e)=>e.stopPropagation();
+// dismiss the permission popover on outside-click or Escape
+document.addEventListener("click",(e)=>{
+  const menu=document.getElementById("permMenu");
+  if(menu.classList.contains("open") && !menu.contains(e.target)) closePermMenu();
+});
+document.addEventListener("keydown",(e)=>{ if(e.key==="Escape") closePermMenu(); });
+
+function renderAll(){ renderStats(); renderRoleList(); renderUserList(); renderResources(); renderItems(); renderConditionsPanel(); renderMatrix(); if(document.getElementById("view-play").classList.contains("active")) fillPlaygroundSelectors(); }
+renderAll();
+</script>
+</body>
+</html>
