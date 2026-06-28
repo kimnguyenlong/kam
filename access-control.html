@@ -393,7 +393,7 @@
             <button class="btn sm primary" id="addCondBtn">+ Condition</button>
           </div>
           <div class="bd">
-            <p class="hint" style="margin:0 0 12px;">Attribute rules evaluated at decision time. Assign one or more to a grant by clicking a matrix cell — when a grant carries several conditions they must <b>all</b> pass. The <b>In use</b> count is how many grants reference each rule.</p>
+            <p class="hint" style="margin:0 0 12px;">Attribute rules evaluated at decision time. Each rule is authored against a <b>resource type</b>, which determines the <b>resource.*</b> attributes its builder offers (generic rules see only <b>owner</b>). Assign one or more to a grant by clicking a matrix cell; when a grant carries several they must <b>all</b> pass. The <b>In use</b> count is how many grants reference each rule.</p>
             <div class="cfg-wrap"><table class="cfg" id="condTable"></table></div>
           </div>
         </div>
@@ -421,7 +421,7 @@
           <button class="btn sm primary" id="addResBtn">+ Type</button>
         </div>
         <div class="bd">
-          <p class="hint" style="margin:0 0 12px;">Resource types are the classes of protected object that roles get permissions on. Each defines its own <b>actions</b> and the <b>department</b> attribute used by ABAC conditions.</p>
+          <p class="hint" style="margin:0 0 12px;">Resource types are the classes of protected object that roles get permissions on. Each defines its own <b>actions</b> and its own set of <b>attributes</b> (exposed to ABAC rules as <span class="mono">resource.&lt;name&gt;</span>).</p>
           <div class="cfg-wrap"><table class="cfg" id="resTable"></table></div>
         </div>
       </div>
@@ -436,7 +436,7 @@
           <button class="btn sm primary" id="addItemBtn">+ Item</button>
         </div>
         <div class="bd">
-          <p class="hint" style="margin:0 0 12px;">Concrete instances of a resource type. Each item has an <b>owner</b> — the subject checked by the <b>If owner</b> condition at decision time. A type itself has no owner.</p>
+          <p class="hint" style="margin:0 0 12px;">Concrete instances of a resource type. Each item has an <b>owner</b> — the subject checked by the <b>If owner</b> condition at decision time — and its own <b>attribute values</b> for the attributes its type declares (blank inherits the type default). A type itself has no owner.</p>
           <div class="row" style="margin:0 0 12px;">
             <span class="hint" style="font-weight:600">Filter by type</span>
             <select id="itemTypeFilter" style="max-width:280px"></select>
@@ -513,39 +513,53 @@ const DOMAINS = ["Billing","Human Resources","CRM","Infrastructure","Governance"
 function seed() {
   return {
     resources: [
-      { key:"billing.invoice", name:"Invoices", domain:"Billing", dept:"Finance", sensitivity:3, region:"US", actions:["create","read","update","delete","list","approve","export"] },
-      { key:"billing.payment", name:"Payments", domain:"Billing", dept:"Finance", sensitivity:4, region:"US", actions:["read","list","approve","export"] },
-      { key:"hr.employee", name:"Employee Records", domain:"Human Resources", dept:"People", sensitivity:4, region:"EU", actions:["create","read","update","delete","list","export"] },
-      { key:"hr.payroll", name:"Payroll", domain:"Human Resources", dept:"People", sensitivity:5, region:"EU", actions:["read","update","approve","export"] },
-      { key:"crm.account", name:"Customer Accounts", domain:"CRM", dept:"Sales", sensitivity:2, region:"US", actions:["create","read","update","delete","list","share"] },
-      { key:"crm.deal", name:"Deals", domain:"CRM", dept:"Sales", sensitivity:3, region:"US", actions:["create","read","update","delete","list","approve"] },
-      { key:"infra.cluster", name:"Compute Clusters", domain:"Infrastructure", dept:"Platform", sensitivity:4, region:"US", actions:["read","update","delete","admin"] },
-      { key:"infra.secret", name:"Secrets Vault", domain:"Infrastructure", dept:"Platform", sensitivity:5, region:"US", actions:["read","update","admin"] },
-      { key:"audit.log", name:"Audit Logs", domain:"Governance", dept:"Platform", sensitivity:4, region:"US", actions:["read","list","export"] },
+      { key:"billing.invoice", name:"Invoices", domain:"Billing", actions:["create","read","update","delete","list","approve","export"],
+        attrs:[{key:"dept",value:"Finance"},{key:"sensitivity",value:3},{key:"region",value:"US"},{key:"currency",value:"USD"},{key:"status",value:"draft"},{key:"amount",value:0}] },
+      { key:"billing.payment", name:"Payments", domain:"Billing", actions:["read","list","approve","export"],
+        attrs:[{key:"dept",value:"Finance"},{key:"sensitivity",value:4},{key:"region",value:"US"},{key:"method",value:"ACH"},{key:"status",value:"pending"},{key:"amount",value:0}] },
+      { key:"hr.employee", name:"Employee Records", domain:"Human Resources", actions:["create","read","update","delete","list","export"],
+        attrs:[{key:"dept",value:"People"},{key:"sensitivity",value:4},{key:"region",value:"EU"},{key:"employment",value:"full-time"},{key:"level",value:"IC"},{key:"pii",value:true}] },
+      { key:"hr.payroll", name:"Payroll", domain:"Human Resources", actions:["read","update","approve","export"],
+        attrs:[{key:"dept",value:"People"},{key:"sensitivity",value:5},{key:"region",value:"EU"},{key:"period",value:"monthly"},{key:"status",value:"draft"}] },
+      { key:"crm.account", name:"Customer Accounts", domain:"CRM", actions:["create","read","update","delete","list","share"],
+        attrs:[{key:"dept",value:"Sales"},{key:"sensitivity",value:2},{key:"region",value:"US"},{key:"tier",value:"standard"},{key:"industry",value:"technology"},{key:"status",value:"active"}] },
+      { key:"crm.deal", name:"Deals", domain:"CRM", actions:["create","read","update","delete","list","approve"],
+        attrs:[{key:"dept",value:"Sales"},{key:"sensitivity",value:3},{key:"region",value:"US"},{key:"stage",value:"open"},{key:"value",value:0},{key:"probability",value:50}] },
+      { key:"infra.cluster", name:"Compute Clusters", domain:"Infrastructure", actions:["read","update","delete","admin"],
+        attrs:[{key:"dept",value:"Platform"},{key:"sensitivity",value:4},{key:"region",value:"US"},{key:"env",value:"prod"},{key:"tier",value:"critical"},{key:"team",value:"core"}] },
+      { key:"infra.secret", name:"Secrets Vault", domain:"Infrastructure", actions:["read","update","admin"],
+        attrs:[{key:"dept",value:"Platform"},{key:"sensitivity",value:5},{key:"region",value:"US"},{key:"kind",value:"credential"},{key:"rotationDays",value:90}] },
+      { key:"audit.log", name:"Audit Logs", domain:"Governance", actions:["read","list","export"],
+        attrs:[{key:"dept",value:"Platform"},{key:"sensitivity",value:4},{key:"region",value:"US"},{key:"retentionDays",value:365},{key:"immutable",value:true}] },
     ],
-    // concrete instances of a resource type; owner lives here, never on the type
+    // concrete instances of a resource type. owner lives here, never on the type.
+    // `attrs` holds per-item VALUES for the attributes the type declares; a key left
+    // out (or blank) falls back to the type's declared default. (dept is intentionally
+    // omitted on most items to demonstrate inheriting the type default.)
     items: [
-      { id:"i_inv1", name:"INV-1001 · Acme Corp", type:"billing.invoice", owner:"u2" },
-      { id:"i_inv2", name:"INV-1002 · Globex", type:"billing.invoice", owner:"u1" },
-      { id:"i_pay1", name:"PAY-5001 · Acme Corp", type:"billing.payment", owner:"u2" },
-      { id:"i_emp1", name:"Employee: Alice Chen", type:"hr.employee", owner:"u3" },
-      { id:"i_emp2", name:"Employee: Sam Lee", type:"hr.employee", owner:"u3" },
-      { id:"i_pr1",  name:"Payroll Run 2026-06", type:"hr.payroll", owner:"u3" },
-      { id:"i_acc1", name:"Account: Acme Corp", type:"crm.account", owner:"u1" },
-      { id:"i_acc2", name:"Account: Globex", type:"crm.account", owner:"u5" },
-      { id:"i_deal1", name:"Deal: Acme Renewal", type:"crm.deal", owner:"u1" },
-      { id:"i_deal2", name:"Deal: Globex Expansion", type:"crm.deal", owner:"u5" },
-      { id:"i_clu1", name:"prod-cluster-1", type:"infra.cluster", owner:"u4" },
-      { id:"i_sec1", name:"db-credentials", type:"infra.secret", owner:"u4" },
-      { id:"i_log1", name:"Audit Log: 2026-Q2", type:"audit.log", owner:"u4" },
+      { id:"i_inv1", name:"INV-1001 · Acme Corp", type:"billing.invoice", owner:"u2", attrs:{sensitivity:2, region:"US", currency:"USD", status:"approved", amount:12500} },
+      { id:"i_inv2", name:"INV-1002 · Globex", type:"billing.invoice", owner:"u1", attrs:{sensitivity:5, region:"EU", currency:"EUR", status:"pending", amount:98000} },
+      { id:"i_pay1", name:"PAY-5001 · Acme Corp", type:"billing.payment", owner:"u2", attrs:{sensitivity:4, method:"WIRE", status:"settled", amount:12500} },
+      { id:"i_emp1", name:"Employee: Alice Chen", type:"hr.employee", owner:"u3", attrs:{sensitivity:3, region:"EU", level:"manager"} },
+      { id:"i_emp2", name:"Employee: Sam Lee", type:"hr.employee", owner:"u3", attrs:{sensitivity:4, region:"US", employment:"contractor"} },
+      { id:"i_pr1",  name:"Payroll Run 2026-06", type:"hr.payroll", owner:"u3", attrs:{sensitivity:5, period:"monthly", status:"finalized"} },
+      { id:"i_acc1", name:"Account: Acme Corp", type:"crm.account", owner:"u1", attrs:{tier:"enterprise", region:"US", industry:"manufacturing"} },
+      { id:"i_acc2", name:"Account: Globex", type:"crm.account", owner:"u5", attrs:{tier:"standard", region:"EU", status:"churned"} },
+      { id:"i_deal1", name:"Deal: Acme Renewal", type:"crm.deal", owner:"u1", attrs:{sensitivity:3, stage:"negotiation", value:250000, probability:75} },
+      { id:"i_deal2", name:"Deal: Globex Expansion", type:"crm.deal", owner:"u5", attrs:{sensitivity:4, stage:"open", value:80000, probability:30} },
+      { id:"i_clu1", name:"prod-cluster-1", type:"infra.cluster", owner:"u4", attrs:{env:"prod", region:"US", tier:"critical", team:"core"} },
+      { id:"i_sec1", name:"db-credentials", type:"infra.secret", owner:"u4", attrs:{sensitivity:5, region:"US", kind:"credential", rotationDays:30} },
+      { id:"i_log1", name:"Audit Log: 2026-Q2", type:"audit.log", owner:"u4", attrs:{sensitivity:4, region:"US", retentionDays:2555} },
     ],
+    // `type` is the resource type the condition was authored against; it drives which
+    // resource.* attributes the builder offers. null = generic (owner-only, any type).
     conditions: [
-      { id:"own",    label:"If owner",             left:"subject.id",        op:"eq",  rightType:"attr",    right:"resource.owner" },
-      { id:"dept",   label:"Same dept",            left:"subject.dept",      op:"eq",  rightType:"attr",    right:"resource.dept" },
-      { id:"sod",    label:"Separation of duties", left:"subject.id",        op:"neq", rightType:"attr",    right:"resource.owner" },
-      { id:"clr",    label:"Sufficient clearance", left:"subject.clearance", op:"gte", rightType:"attr",    right:"resource.sensitivity" },
-      { id:"active", label:"Active employee",      left:"subject.status",    op:"eq",  rightType:"literal", right:"active" },
-      { id:"region", label:"Same data region",     left:"subject.region",    op:"eq",  rightType:"attr",    right:"resource.region" },
+      { id:"own",    label:"If owner",             type:null,             left:"subject.id",        op:"eq",  rightType:"attr",    right:"resource.owner" },
+      { id:"dept",   label:"Same dept",            type:"crm.account",    left:"subject.dept",      op:"eq",  rightType:"attr",    right:"resource.dept" },
+      { id:"sod",    label:"Separation of duties", type:"billing.invoice",left:"subject.id",        op:"neq", rightType:"attr",    right:"resource.owner" },
+      { id:"clr",    label:"Sufficient clearance", type:"infra.secret",   left:"subject.clearance", op:"gte", rightType:"attr",    right:"resource.sensitivity" },
+      { id:"active", label:"Active employee",      type:"hr.employee",    left:"subject.status",    op:"eq",  rightType:"literal", right:"active" },
+      { id:"region", label:"Same data region",     type:"crm.account",    left:"subject.region",    op:"eq",  rightType:"attr",    right:"resource.region" },
     ],
     roles: [
       { id:"r_base", name:"Employee", desc:"Baseline access for all staff", parent:null,
@@ -576,11 +590,22 @@ function seed() {
 }
 
 // ABAC attribute namespace: resolved into a flat bag at decision time.
-const ATTRS = [
-  { key:"subject.id" }, { key:"subject.name" }, { key:"subject.dept" }, { key:"subject.email" },
-  { key:"subject.clearance" }, { key:"subject.region" }, { key:"subject.status" },
-  { key:"resource.owner" }, { key:"resource.dept" }, { key:"resource.sensitivity" }, { key:"resource.region" },
+// Subject attributes are fixed (they come off the user). Resource attributes are
+// DYNAMIC — each resource type DECLARES its own (see resAttrKeys()) and supplies a
+// default; each resource ITEM may override that default with its own value. `owner`
+// is the one resource attribute every type has, supplied by the selected item.
+const SUBJECT_ATTRS = [
+  "subject.id","subject.name","subject.dept","subject.email","subject.clearance","subject.region","subject.status",
 ];
+// resource attribute keys available for a given resource type (owner + the type's custom attrs)
+function resAttrKeys(resKey){
+  const r=resByKey(resKey);
+  const keys=["resource.owner"];
+  (r&&r.attrs||[]).forEach(a=>keys.push("resource."+a.key));
+  return keys;
+}
+// the full attribute list the condition builder offers for a resource type
+function attrKeysFor(resKey){ return SUBJECT_ATTRS.concat(resAttrKeys(resKey)); }
 const OPS = {
   eq:  { sym:"=",  label:"equals" },
   neq: { sym:"≠",  label:"not equals" },
@@ -606,13 +631,35 @@ function migrate(db){
   db.conditions = db.conditions.filter(c=>c.id!=="prod" && c.left!=="request.env");
   // add any missing built-in enterprise conditions (sod / clearance / active / region)
   seed().conditions.forEach(sc=>{ if(!db.conditions.some(c=>c.id===sc.id)) db.conditions.push(sc); });
-  // backfill dept + new ABAC attributes (sensitivity, region) on resource types
+  // condition scope: older saves stored a multi-type `types` array; collapse to a single
+  // authoring `type` (drives the dynamic attribute list). Default from seed, else null.
+  const seededC=seed().conditions;
+  db.conditions.forEach(c=>{
+    if(c.type===undefined){
+      const s=seededC.find(x=>x.id===c.id);
+      c.type = s ? s.type : (Array.isArray(c.types)&&c.types.length ? c.types[0] : null);
+    }
+    delete c.types;
+  });
+  // resource types: fixed dept/sensitivity/region fields became a dynamic `attrs` list
   const seeded = seed().resources;
   (db.resources||[]).forEach(r=>{
+    if(!Array.isArray(r.attrs)){
+      const s=seeded.find(x=>x.key===r.key);
+      if(s){ r.attrs = s.attrs.map(a=>({...a})); }
+      else {
+        r.attrs=[];
+        if(r.dept!==undefined && r.dept!=="") r.attrs.push({key:"dept",value:r.dept});
+        if(r.sensitivity!==undefined) r.attrs.push({key:"sensitivity",value:r.sensitivity});
+        if(r.region!==undefined && r.region!=="") r.attrs.push({key:"region",value:r.region});
+      }
+    }
+    delete r.dept; delete r.sensitivity; delete r.region;
+    // backfill newly-declared seed attribute keys without disturbing existing values
     const s=seeded.find(x=>x.key===r.key);
-    if(r.dept===undefined){ r.dept = s?s.dept:""; }
-    if(r.sensitivity===undefined){ r.sensitivity = s?s.sensitivity:1; }
-    if(r.region===undefined){ r.region = s?s.region:""; }
+    if(s && Array.isArray(r.attrs)){
+      s.attrs.forEach(sa=>{ if(!r.attrs.some(a=>a.key===sa.key)) r.attrs.push({...sa}); });
+    }
   });
   // backfill new subject attributes (clearance, region, status) on users
   const seededU=seed().users;
@@ -630,6 +677,9 @@ function migrate(db){
     if(!db.items.length) db.items = seed().items.filter(i=>(db.resources||[]).some(r=>r.key===i.type));
   }
   (db.resources||[]).forEach(r=>{ delete r.owner; });
+  // resource items gained a per-item attribute VALUE map (overrides the type's declared
+  // default). Older saves stored values only on the type, so default to {} = inherit.
+  (db.items||[]).forEach(i=>{ if(!i.attrs || typeof i.attrs!=="object" || Array.isArray(i.attrs)) i.attrs={}; });
   // any grant still referencing the removed "prod" condition becomes a plain allow
   (db.roles||[]).forEach(role=>{
     for(const k in (role.grants||{})) if(role.grants[k]==="prod") role.grants[k]="allow";
@@ -686,6 +736,10 @@ function effectiveUserGrants(userId){
 
 /* ---------- ABAC conditions ---------- */
 function condById(id){ return (DB.conditions||[]).find(c=>c.id===id); }
+// the resource type a grant key targets ("billing.invoice:read" -> "billing.invoice")
+function keyResKey(k){ const i=k.lastIndexOf(":"); return i<0?k:k.slice(0,i); }
+// the type a condition was authored against (its name), for display
+function condTypeLabel(c){ const r=c&&c.type?resByKey(c.type):null; return r?r.name:"Generic"; }
 // normalize a grant effect into its list of ABAC condition ids (null for allow/deny/empty).
 // a conditional grant is stored as an array of ids; legacy saves may store a single id string.
 function condIds(effect){
@@ -717,14 +771,25 @@ function applyOp(op,l,r){
     default:    return false;
   }
 }
-// resolve the subject/resource/request attribute bag for a decision
-function buildAttrs(u, ctx){
-  return {
+// resolve an item's value for one declared attribute: the item's own value if it set
+// one (non-blank), otherwise the type's declared default.
+function resolveItemAttr(itemAttrs, decl){
+  const v = itemAttrs ? itemAttrs[decl.key] : undefined;
+  return (v!==undefined && v!=="") ? v : decl.value;
+}
+// resolve the subject/resource attribute bag for a decision.
+// resource.* attributes are the targeted type's declared `attrs` (dynamic per type),
+// each resolved to the selected item's value (ctx.attrs) or the type default.
+// `owner` is supplied by the selected item via ctx.
+function buildAttrs(u, resKey, ctx){
+  const bag={
     "subject.id":u.id, "subject.name":u.name, "subject.dept":u.dept, "subject.email":u.email,
     "subject.clearance":u.clearance, "subject.region":u.region, "subject.status":u.status,
-    "resource.owner":ctx.owner, "resource.dept":ctx.resourceDept,
-    "resource.sensitivity":ctx.resourceSensitivity, "resource.region":ctx.resourceRegion,
+    "resource.owner":ctx.owner,
   };
+  const r=resByKey(resKey);
+  (r&&r.attrs||[]).forEach(a=>{ bag["resource."+a.key]=resolveItemAttr(ctx.attrs, a); });
+  return bag;
 }
 // evaluate effect against an attribute bag -> {pass, reason}
 function evalCondition(effect, attrs){
@@ -772,7 +837,7 @@ function decide(userId, resKey, action, ctx){
   }
 
   // conditional grant: every assigned ABAC condition must pass (AND)
-  const attrs=buildAttrs(u, ctx);
+  const attrs=buildAttrs(u, resKey, ctx);
   const ids=condIds(match.effect)||[];
   let allPass=true, firstFail=null;
   for(const id of ids){
@@ -919,7 +984,11 @@ function permMenuHtml(cur){
       <span class="pmradio ${mode===val?"on":""}"></span>
       <div class="pmtext"><div class="pmtitle">${dot} ${title}</div></div>
     </div>`).join("");
-  const conds=DB.conditions||[];
+  // only offer conditions relevant to this cell's resource type: ones authored against
+  // it, plus generic (owner-only) rules that apply to any type. This keeps the offered
+  // conditions — and their resource.* attributes — in step with the resource type.
+  const resKey=pmCellKey!=null?keyResKey(pmCellKey):null;
+  const conds=(DB.conditions||[]).filter(c=>!c.type||c.type===resKey);
   const condRows=conds.length
     ? conds.map(c=>{
         const on=ids.includes(c.id);
@@ -932,7 +1001,7 @@ function permMenuHtml(cur){
           </div>
         </div>`;
       }).join("")
-    : `<div class="pmempty">No conditions yet.</div>`;
+    : `<div class="pmempty">No conditions for this resource type yet.</div>`;
   const note = ids.length>1 ? ` <span style="text-transform:none;font-weight:500;color:var(--muted-2)">· all must pass</span>` : "";
   return fixed
     + `<div class="pmsep">ABAC conditions${note}</div>` + condRows
@@ -1066,16 +1135,17 @@ function renderResources(){
   const el=document.getElementById("resTable");
   if(!el)return;
   el.innerHTML = DB.resources.length
-    ? `<thead><tr><th>Type</th><th>Key</th><th>Domain</th><th>Dept</th><th style="text-align:center">Sens.</th><th>Region</th><th style="text-align:center">Items</th><th>Actions</th><th class="actcell"></th></tr></thead><tbody>`+
+    ? `<thead><tr><th>Type</th><th>Key</th><th>Domain</th><th>Attributes</th><th style="text-align:center">Items</th><th>Actions</th><th class="actcell"></th></tr></thead><tbody>`+
       DB.resources.map(r=>{
         const itemCount=itemsByType(r.key).length;
+        const attrTags=(r.attrs||[]).length
+          ? (r.attrs||[]).map(a=>`<span class="tag" title="resource.${esc(a.key)} — default (items may override)"><b>${esc(a.key)}</b>=${esc(String(a.value))}</span>`).join("")
+          : `<span style="color:var(--muted-2)">— owner only —</span>`;
         return `<tr>
           <td><span class="idot" style="background:var(--accent)"></span><b>${esc(r.name)}</b></td>
           <td class="mono" style="color:var(--muted-2)">${esc(r.key)}</td>
           <td>${esc(r.domain||"—")}</td>
-          <td>${esc(r.dept||"—")}</td>
-          <td style="text-align:center">${esc(r.sensitivity!=null?String(r.sensitivity):"—")}</td>
-          <td>${esc(r.region||"—")}</td>
+          <td>${attrTags}</td>
           <td style="text-align:center"><span class="count">${itemCount}</span></td>
           <td>${r.actions.map(a=>`<span class="tag">${esc(a)}</span>`).join("")}</td>
           <td class="actcell"><button class="btn sm ghost" data-editres="${esc(r.key)}">✎</button></td>
@@ -1085,22 +1155,55 @@ function renderResources(){
   el.querySelectorAll("[data-editres]").forEach(b=>b.onclick=()=>openResource(resByKey(b.dataset.editres)));
 }
 function addResource(){ openResource(null); }
+// one editable attribute row (key + default value + remove) for the resource-type form.
+// the value here is the type's DEFAULT; each item may override it per-item.
+function attrRowHtml(k,v){
+  return `<div class="row attr-row" style="gap:8px;align-items:center;margin-bottom:6px">
+    <span class="mono" style="color:var(--muted-2);flex:none">resource.</span>
+    <input type="text" class="attr-k mono" value="${esc(k||"")}" placeholder="attribute" style="flex:1">
+    <span style="flex:none;color:var(--muted-2)">=</span>
+    <input type="text" class="attr-v" value="${esc(v==null?"":String(v))}" placeholder="default value" style="flex:1">
+    <button type="button" class="btn sm ghost attr-del" title="Remove">✕</button>
+  </div>`;
+}
+// wire add/remove buttons for the resource-type attribute editor (call after the modal renders)
+function wireResAttrs(){
+  const box=document.getElementById("f_resattrs"); if(!box) return;
+  box.querySelectorAll(".attr-del").forEach(b=>b.onclick=()=>{ b.closest(".attr-row").remove(); });
+  const add=document.getElementById("f_resattr_add");
+  if(add) add.onclick=()=>{ box.insertAdjacentHTML("beforeend", attrRowHtml("","")); wireResAttrs(); };
+}
+// read attribute rows -> [{key,value}], numeric strings coerced to numbers; blank keys dropped
+function readResAttrs(){
+  const out=[];
+  document.querySelectorAll("#f_resattrs .attr-row").forEach(row=>{
+    const k=row.querySelector(".attr-k").value.trim();
+    if(!k) return;
+    const raw=row.querySelector(".attr-v").value.trim();
+    const num=Number(raw);
+    out.push({key:k, value:(raw!==""&&!isNaN(num))?num:raw});
+  });
+  return out;
+}
 function openResource(res){
   const actChks=ACTIONS_LIB.map(a=>`<label class="chk"><input type="checkbox" value="${a}" ${(res?res.actions.includes(a):["read","list"].includes(a))?"checked":""}> ${a}</label>`).join("");
   const domainOpts=DOMAINS.map(d=>`<option value="${esc(d)}" ${res&&res.domain===d?"selected":""}>${esc(d)}</option>`).join("");
+  const attrs = res ? (res.attrs||[]) : [{key:"dept",value:""},{key:"sensitivity",value:1},{key:"region",value:""}];
+  const attrRows = attrs.map(a=>attrRowHtml(a.key,a.value)).join("");
   openModal(res?"Edit Resource Type":"New Resource Type", `
     <label class="field"><span>Display name</span><input type="text" id="f_resname" value="${res?esc(res.name):""}" placeholder="e.g. Support Tickets"></label>
     <div class="row"><label class="field" style="flex:1"><span>Key</span><input type="text" id="f_reskey" value="${res?esc(res.key):""}" placeholder="support.ticket" class="mono" ${res?"disabled":""}></label>
     <label class="field" style="flex:1"><span>Domain</span><select id="f_resdomain">${domainOpts}</select></label></div>
-    <div class="row"><label class="field" style="flex:1"><span>Department</span><input type="text" id="f_resdept" value="${res?esc(res.dept||""):""}" placeholder="e.g. Sales"></label>
-    <label class="field" style="flex:1"><span>Sensitivity (1–5)</span><input type="number" id="f_ressens" min="1" max="5" value="${res&&res.sensitivity!=null?esc(String(res.sensitivity)):"1"}"></label>
-    <label class="field" style="flex:1"><span>Data region</span><input type="text" id="f_resregion" value="${res?esc(res.region||""):""}" placeholder="e.g. US"></label></div>
+    <label class="field"><span>Resource attributes <span style="text-transform:none;font-weight:400;color:var(--muted-2)">— name + default value</span></span></label>
+    <div id="f_resattrs">${attrRows}</div>
+    <button type="button" class="btn sm ghost" id="f_resattr_add" style="margin-bottom:4px">+ Attribute</button>
     <label class="field"><span>Actions</span></label><div class="checks" id="f_resact">${actChks}</div>
-    <p class="hint">A type has no owner — owners are set per resource item. Sensitivity &amp; region feed the clearance and data-residency ABAC conditions.</p>`,[
+    <p class="hint">Each type <b>declares</b> its own attributes, exposed to ABAC rules as <b>resource.&lt;name&gt;</b> (e.g. resource.sensitivity). The value set here is the <b>default</b>; each resource item can override it with its own value. The condition builder shows these dynamically when this type is selected. <b>owner</b> is implicit — it's set per resource item.</p>`,[
     {label:"Cancel",cls:"ghost",on:closeModal},
     ...(res?[{label:"Delete",cls:"danger",on:()=>{
       DB.resources=DB.resources.filter(x=>x.key!==res.key);
       DB.items=(DB.items||[]).filter(i=>i.type!==res.key); // drop orphaned items
+      (DB.conditions||[]).forEach(c=>{ if(c.type===res.key) c.type=null; }); // un-scope dependent conditions
       save(); closeModal(); renderAll(); toast("Resource type deleted"); }}]:[]),
     {label:res?"Save":"Create",cls:"primary",on:()=>{
       const name=document.getElementById("f_resname").value.trim();
@@ -1109,14 +1212,13 @@ function openResource(res){
       if(!res&&resByKey(key))return toast("Key already exists");
       const actions=[...document.querySelectorAll("#f_resact input:checked")].map(c=>c.value);
       if(!actions.length)return toast("Pick at least one action");
-      const dept=document.getElementById("f_resdept").value.trim();
       const domain=document.getElementById("f_resdomain").value;
-      const sensitivity=parseInt(document.getElementById("f_ressens").value,10)||1;
-      const region=document.getElementById("f_resregion").value.trim();
-      if(res){ Object.assign(res,{name,domain,dept,sensitivity,region,actions}); }
-      else DB.resources.push({key,name,domain,dept,sensitivity,region,actions});
+      const attrs=readResAttrs();
+      if(res){ Object.assign(res,{name,domain,actions,attrs}); }
+      else DB.resources.push({key,name,domain,actions,attrs});
       save(); closeModal(); renderAll(); toast(res?"Resource type updated":"Resource type added",true);
     }}]);
+  wireResAttrs();
 }
 
 /* ---------- Resource items (instances of a type; owner lives here) ---------- */
@@ -1135,13 +1237,22 @@ function renderItems(){
   const cnt=document.getElementById("itemFilterCount");
   if(cnt) cnt.textContent=typeFilter ? `${items.length} of ${allItems.length} shown` : "";
   el.innerHTML = items.length
-    ? `<thead><tr><th>Item</th><th>Resource type</th><th>Owner</th><th class="actcell"></th></tr></thead><tbody>`+
+    ? `<thead><tr><th>Item</th><th>Resource type</th><th>Owner</th><th>Attributes</th><th class="actcell"></th></tr></thead><tbody>`+
       items.map(it=>{
         const res=resByKey(it.type); const own=userById(it.owner);
+        const decls=(res&&res.attrs)||[];
+        const attrTags=decls.length
+          ? decls.map(d=>{
+              const has=it.attrs&&it.attrs[d.key]!==undefined&&it.attrs[d.key]!=="";
+              const v=resolveItemAttr(it.attrs, d);
+              return `<span class="tag" title="resource.${esc(d.key)}${has?'':' (inherited default)'}"><b>${esc(d.key)}</b>=${esc(String(v))}${has?'':'<span style="color:var(--muted-2)">·def</span>'}</span>`;
+            }).join("")
+          : `<span style="color:var(--muted-2)">— owner only —</span>`;
         return `<tr>
           <td><span class="idot" style="background:var(--green)"></span><b>${esc(it.name)}</b></td>
           <td>${esc(res?res.name:it.type)} <span class="mono" style="color:var(--muted-2)">${esc(it.type)}</span></td>
           <td>${esc(own?own.name:"—")}</td>
+          <td>${attrTags}</td>
           <td class="actcell"><button class="btn sm ghost" data-edititem="${esc(it.id)}">✎</button></td>
         </tr>`;
       }).join("")+`</tbody>`
@@ -1152,14 +1263,45 @@ function addItem(){
   if(!DB.resources.length) return toast("Create a resource type first");
   openItem(null);
 }
+// per-attribute value inputs for the item form, derived from the selected type's
+// declared attrs. Prefill from the item only when it actually targets this type;
+// each placeholder shows the type's default (blank input = inherit that default).
+function itemAttrFieldsHtml(typeKey, it){
+  const decls=((resByKey(typeKey)||{}).attrs)||[];
+  if(!decls.length) return `<p class="hint" style="margin:2px 0 0">This type declares no attributes — only <b>owner</b> applies.</p>`;
+  const prefill = it && it.type===typeKey ? (it.attrs||{}) : {};
+  return decls.map(d=>{
+    const cur = prefill[d.key];
+    return `<div class="row" style="gap:8px;align-items:center;margin-bottom:6px">
+      <span class="mono" style="color:var(--muted-2);flex:none;min-width:150px">resource.${esc(d.key)}</span>
+      <span style="flex:none;color:var(--muted-2)">=</span>
+      <input type="text" class="item-attr-v" data-key="${esc(d.key)}" value="${esc(cur==null?"":String(cur))}" placeholder="default: ${esc(fmtVal(d.value))}" style="flex:1">
+    </div>`;
+  }).join("");
+}
+// read the item attribute inputs -> {key:value}; blanks are dropped (inherit default),
+// numeric strings coerced to numbers.
+function readItemAttrs(){
+  const out={};
+  document.querySelectorAll("#f_itattrs .item-attr-v").forEach(inp=>{
+    const raw=inp.value.trim();
+    if(raw==="") return;
+    const num=Number(raw);
+    out[inp.dataset.key] = (!isNaN(num)) ? num : raw;
+  });
+  return out;
+}
 function openItem(it){
   const typeOpts=DB.resources.map(r=>`<option value="${esc(r.key)}" ${it&&it.type===r.key?"selected":""}>${esc(r.name)} (${esc(r.key)})</option>`).join("");
   const ownerOpts=`<option value="">— none —</option>`+DB.users.map(u=>`<option value="${u.id}" ${it&&it.owner===u.id?"selected":""}>${esc(u.name)}</option>`).join("");
+  const curType = it ? it.type : (DB.resources[0]&&DB.resources[0].key);
   openModal(it?"Edit Resource Item":"New Resource Item", `
     <label class="field"><span>Display name</span><input type="text" id="f_itname" value="${it?esc(it.name):""}" placeholder="e.g. INV-1003 · Initech"></label>
     <label class="field"><span>Resource type</span><select id="f_ittype">${typeOpts}</select></label>
     <label class="field"><span>Owner</span><select id="f_itowner">${ownerOpts}</select></label>
-    <p class="hint">The owner is the subject matched by the <b>If owner</b> ABAC condition when this item is the request target.</p>`,[
+    <label class="field"><span>Attribute values <span style="text-transform:none;font-weight:400;color:var(--muted-2)">— per item; blank inherits the type default</span></span></label>
+    <div id="f_itattrs">${itemAttrFieldsHtml(curType, it)}</div>
+    <p class="hint">The owner is the subject matched by the <b>If owner</b> ABAC condition when this item is the request target. The attribute values above are what <b>resource.&lt;name&gt;</b> resolves to for this specific item.</p>`,[
     {label:"Cancel",cls:"ghost",on:closeModal},
     ...(it?[{label:"Delete",cls:"danger",on:()=>{ DB.items=DB.items.filter(x=>x.id!==it.id); save(); closeModal(); renderAll(); toast("Resource item deleted"); }}]:[]),
     {label:it?"Save":"Create",cls:"primary",on:()=>{
@@ -1167,10 +1309,15 @@ function openItem(it){
       const type=document.getElementById("f_ittype").value;
       if(!name||!type)return toast("Name and type required");
       const owner=document.getElementById("f_itowner").value;
-      if(it){ Object.assign(it,{name,type,owner}); }
-      else { DB.items=DB.items||[]; DB.items.push({id:uid("i_"),name,type,owner}); }
+      const attrs=readItemAttrs();
+      if(it){ Object.assign(it,{name,type,owner,attrs}); }
+      else { DB.items=DB.items||[]; DB.items.push({id:uid("i_"),name,type,owner,attrs}); }
       save(); closeModal(); renderAll(); toast(it?"Resource item updated":"Resource item added",true);
     }}]);
+  // swapping the resource type re-declares which attributes this item has
+  document.getElementById("f_ittype").onchange=(e)=>{
+    document.getElementById("f_itattrs").innerHTML=itemAttrFieldsHtml(e.target.value, it);
+  };
 }
 
 /* ---------- ABAC condition management (assigned inline via the matrix popover) ---------- */
@@ -1180,13 +1327,16 @@ function renderConditionsPanel(){
   const conds=DB.conditions||[];
   const cnt=document.getElementById("condPanelCount"); if(cnt) cnt.textContent=conds.length+" total";
   el.innerHTML = conds.length
-    ? `<thead><tr><th>Condition</th><th>Expression</th><th style="text-align:center">In use</th><th class="actcell"></th></tr></thead><tbody>`+
-      conds.map(c=>`<tr>
+    ? `<thead><tr><th>Condition</th><th>Expression</th><th>Resource type</th><th style="text-align:center">In use</th><th class="actcell"></th></tr></thead><tbody>`+
+      conds.map(c=>{
+        const generic=!c.type;
+        return `<tr>
         <td><span class="idot" style="background:var(--amber)"></span><b>◆ ${esc(c.label)}</b></td>
         <td class="mono" style="color:var(--muted)">${esc(condExpr(c))}</td>
+        <td><span class="pill" style="${generic?'':'color:var(--amber);border-color:rgba(210,153,34,.4)'}">${esc(condTypeLabel(c))}</span></td>
         <td style="text-align:center"><span class="count">${grantUseCount(c.id)}</span></td>
         <td class="actcell"><button class="btn sm ghost" data-editcond="${c.id}">✎</button></td>
-      </tr>`).join("")+`</tbody>`
+      </tr>`;}).join("")+`</tbody>`
     : `<tbody><tr><td class="empty">No conditions defined. Click <b>+ Condition</b>, or a matrix cell, to create one.</td></tr></tbody>`;
   el.querySelectorAll("[data-editcond]").forEach(b=>b.onclick=()=>editCondition(b.dataset.editcond));
 }
@@ -1199,22 +1349,43 @@ function grantUseCount(id){
   return n;
 }
 
-function condFormHtml(c){
-  const attrOpts=(sel)=>ATTRS.map(a=>`<option value="${a.key}" ${sel===a.key?"selected":""}>${esc(a.key)}</option>`).join("");
+function condFormHtml(c, defaultType){
+  const curType=c?(c.type||""):(defaultType||"");
+  const typeOpts=`<option value="" ${curType===""?"selected":""}>— Generic (owner only) —</option>`+
+    DB.resources.map(r=>`<option value="${esc(r.key)}" ${curType===r.key?"selected":""}>${esc(r.name)} (${esc(r.key)})</option>`).join("");
   const opOpts=Object.entries(OPS).map(([k,o])=>`<option value="${k}" ${c&&c.op===k?"selected":""}>${esc(o.sym)}  ${esc(o.label)}</option>`).join("");
   const rt=c?c.rightType:"attr";
+  // left/right attribute <select>s are filled dynamically by condFormWire() from the
+  // chosen resource type; data-init carries the value to preselect on first render.
+  const leftInit=c?c.left:"subject.dept";
+  const rightInit=c&&c.rightType==="attr"?c.right:"resource.owner";
   return `<label class="field"><span>Label</span><input type="text" id="f_clabel" value="${c?esc(c.label):""}" placeholder="e.g. Senior staff only"></label>
-    <label class="field"><span>Subject / resource / request attribute</span><select id="f_cleft">${attrOpts(c?c.left:"subject.dept")}</select></label>
+    <label class="field"><span>Resource type <span style="text-transform:none;font-weight:400;color:var(--muted-2)">— sets the resource.* attributes below</span></span><select id="f_ctype">${typeOpts}</select></label>
+    <label class="field"><span>Subject / resource attribute</span><select id="f_cleft" data-init="${esc(leftInit)}"></select></label>
     <label class="field"><span>Operator</span><select id="f_cop">${opOpts}</select></label>
     <label class="field"><span>Compare against</span><select id="f_crighttype">
       <option value="attr" ${rt==="attr"?"selected":""}>Another attribute</option>
       <option value="literal" ${rt==="literal"?"selected":""}>A literal value</option></select></label>
-    <label class="field" id="f_crightattr_w"><span>Right attribute</span><select id="f_crightattr">${attrOpts(c&&c.rightType==="attr"?c.right:"resource.dept")}</select></label>
+    <label class="field" id="f_crightattr_w"><span>Right attribute</span><select id="f_crightattr" data-init="${esc(rightInit)}"></select></label>
     <label class="field" id="f_crightlit_w"><span>Literal value</span><input type="text" id="f_crightlit" value="${c&&c.rightType==="literal"?esc(c.right):""}" placeholder="e.g. prod"></label>
-    <p class="hint">The rule passes when <b>attribute</b> <b>operator</b> <b>value</b> holds for the request. Numeric operators parse both sides as numbers; <b>∈</b> matches against a comma-separated list.</p>`;
+    <p class="hint">The available <b>resource.*</b> attributes change with the selected resource type. The rule passes when <b>attribute</b> <b>operator</b> <b>value</b> holds for the request. Numeric operators parse both sides as numbers; <b>∈</b> matches against a comma-separated list.</p>`;
 }
-// toggle attribute vs literal inputs after the modal renders
+// wire the form after render: repopulate the attribute selects from the chosen resource
+// type, and toggle attribute-vs-literal inputs.
 function condFormWire(){
+  const typeSel=document.getElementById("f_ctype");
+  const leftSel=document.getElementById("f_cleft");
+  const rightSel=document.getElementById("f_crightattr");
+  const optsHtml=(keys,sel)=>keys.map(k=>`<option value="${esc(k)}" ${k===sel?"selected":""}>${esc(k)}</option>`).join("");
+  const repopulate=()=>{
+    const keys=attrKeysFor(typeSel.value);
+    const lprev=leftSel.value||leftSel.dataset.init;
+    const rprev=rightSel.value||rightSel.dataset.init;
+    leftSel.innerHTML=optsHtml(keys, keys.includes(lprev)?lprev:keys[0]);
+    rightSel.innerHTML=optsHtml(keys, keys.includes(rprev)?rprev:keys[0]);
+  };
+  repopulate();
+  typeSel.onchange=repopulate;
   const t=document.getElementById("f_crighttype");
   const upd=()=>{ const lit=t.value==="literal";
     document.getElementById("f_crightattr_w").style.display=lit?"none":"";
@@ -1229,13 +1400,16 @@ function readCondForm(existing){
     ? document.getElementById("f_crightlit").value.trim()
     : document.getElementById("f_crightattr").value;
   if(rightType==="literal" && !right){ toast("Literal value required"); return null; }
-  return { id: existing?existing.id:uid("c_"), label,
+  const type=document.getElementById("f_ctype").value||null;
+  return { id: existing?existing.id:uid("c_"), label, type,
     left:document.getElementById("f_cleft").value,
     op:document.getElementById("f_cop").value, rightType, right };
 }
 // assignToKey (optional): when created from a matrix cell, assign the new condition to that grant
 function addCondition(assignToKey){
-  openModal("New Condition", condFormHtml(null),[
+  // when launched from a matrix cell, default the resource type to that cell's type
+  const defaultType = typeof assignToKey==="string" ? keyResKey(assignToKey) : "";
+  openModal("New Condition", condFormHtml(null, defaultType),[
     {label:"Cancel",cls:"ghost",on:closeModal},
     {label:"Create",cls:"primary",on:()=>{ const c=readCondForm(null); if(!c)return;
       DB.conditions=DB.conditions||[]; DB.conditions.push(c);
@@ -1286,27 +1460,28 @@ function fillActions(){
   setOptions(a,(res?res.actions:[]).map(x=>`<option value="${x}">${x}</option>`).join(""),a.value);
   updateCtxHint();
 }
-// show the attributes the request will be evaluated against: item owner + type dept
+// show the attributes the request will be evaluated against: item owner + the type's own attrs
 function updateCtxHint(){
   const el=document.getElementById("pgCtxHint"); if(!el)return;
   const res=resByKey(document.getElementById("pgRes").value);
   if(!res){ el.innerHTML=""; return; }
   const it=itemById(document.getElementById("pgItem").value);
   const own=it?userById(it.owner):null;
-  el.innerHTML=`Context: item <b>${esc(it?it.name:"—")}</b> · owner <b>${esc(own?own.name:"—")}</b> · type dept <b>${esc(res.dept||"—")}</b> · sensitivity <b>${esc(res.sensitivity!=null?String(res.sensitivity):"—")}</b> · region <b>${esc(res.region||"—")}</b>`;
+  const attrBits=(res.attrs||[]).map(a=>{
+    const v=resolveItemAttr(it&&it.attrs, a);
+    const inherited=!(it&&it.attrs&&it.attrs[a.key]!==undefined&&it.attrs[a.key]!=="");
+    return `resource.${esc(a.key)} <b>${esc(String(v))}</b>${inherited?'<span style="color:var(--muted-2)"> (default)</span>':''}`;
+  }).join(" · ");
+  el.innerHTML=`Context: item <b>${esc(it?it.name:"—")}</b> · owner <b>${esc(own?own.name:"—")}</b>${attrBits?" · "+attrBits:""}`;
 }
 function runPlayground(){
   const userId=document.getElementById("pgUser").value;
   const resKey=document.getElementById("pgRes").value;
   const action=document.getElementById("pgAction").value;
-  const res0=resByKey(resKey);
   const item=itemById(document.getElementById("pgItem").value);
-  const ctx={
-    owner:item?item.owner:"",
-    resourceDept:res0?res0.dept:"",
-    resourceSensitivity:res0?res0.sensitivity:"",
-    resourceRegion:res0?res0.region:"",
-  };
+  // ctx carries the selected item's owner + its per-attribute value overrides; buildAttrs()
+  // resolves each resource.* attribute to the item's value or the type's declared default.
+  const ctx={ owner:item?item.owner:"", attrs:item&&item.attrs||{} };
   const res=decide(userId,resKey,action,ctx);
   const v=document.getElementById("verdict");
   v.className="verdict "+(res.allow?"allow":"deny");

@@ -12,15 +12,15 @@ The whole app is in the `<script>` block of `access-control.html`. State lives i
 
 ### Resource types vs. items
 
-- `DB.resources` are **resource types** (the classes roles get permissions on): `{key, name, domain, dept, actions}`. A type has **no owner**.
-- `DB.items` are **resource items** — concrete instances of a type: `{id, name, type, owner}` where `type` is a resource key and `owner` is a user id. Ownership lives only on items. `itemsByType(key)` / `itemById(id)` look them up.
+- `DB.resources` are **resource types** (the classes roles get permissions on): `{key, name, domain, actions, attrs}`. A type has **no owner**. `attrs` is `[{key, value}]` — the type **declares** each ABAC attribute (exposed as `resource.<key>`) and the `value` is its **default**.
+- `DB.items` are **resource items** — concrete instances of a type: `{id, name, type, owner, attrs}` where `type` is a resource key, `owner` is a user id, and `attrs` is a `{key: value}` map of **per-item overrides** for the attributes the type declares (a missing/blank key inherits the type default; `resolveItemAttr()` does the lookup). Ownership and attribute values live only on items. `itemsByType(key)` / `itemById(id)` look them up.
 
 ### The permission model (the part that requires reading multiple functions together)
 
 - **Roles** form an inheritance tree via `parent`. A role's `grants` map keys of the form `"<resourceKey>:<action>"` to an *effect*: `allow`, `deny`, or an ABAC condition id (seeded: `own` / `dept`). Condition labels come from `condLabel()`.
 - `roleChain(id)` walks self → ancestors. `effectiveRoleGrants(id)` flattens the chain so **closer roles override more distant ancestors** (it iterates furthest-ancestor-first, overwriting).
 - `effectiveUserGrants(userId)` merges grants across all of a user's roles with **deny-wins** precedence.
-- `decide(userId, resKey, action, ctx)` is the evaluation engine: resolves roles, finds the matching grant, then applies precedence rules — **no grant = default deny**, **explicit `deny` beats any allow**, otherwise `evalCondition()` checks the ABAC condition against the request `ctx` (`owner` from the selected item, `resourceDept` from the type). It returns `{allow, reason, trace}` where `trace` is the step list rendered in the Playground.
+- `decide(userId, resKey, action, ctx)` is the evaluation engine: resolves roles, finds the matching grant, then applies precedence rules — **no grant = default deny**, **explicit `deny` beats any allow**, otherwise `evalCondition()` checks the ABAC condition against the attribute bag from `buildAttrs()` (subject attrs from the user; `resource.*` resolved per the selected item's `attrs`/`owner`, falling back to the type's declared defaults). It returns `{allow, reason, trace}` where `trace` is the step list rendered in the Playground.
 
 When changing access logic, keep these precedence invariants intact: default-deny, deny-over-allow, and nearer-role-over-ancestor.
 
