@@ -4,36 +4,101 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-"Sentinel — Access Control Manager" is a **single self-contained HTML file** (`access-control.html`) — an in-browser prototype of an RBAC + ABAC access-control engine. There is no build system, no dependencies, no server. Open the file directly in a browser (`open access-control.html`) to run it. All HTML, CSS, and JavaScript live inline in that one file.
+KAM is a Go backend port of the `access-control.html` prototype — an **RBAC + ABAC** access-control
+service. The HTML file is kept in the repo as the **reference prototype**; the Go engine faithfully ports
+its `decide()` and is meant to stay behavior-compatible with it. Module: `github.com/kimnguyenlong/kam`.
+
+The service performs **no authentication** — callers pass an already-authenticated subject id.
+
+## Commands
+
+```bash
+go build ./cmd/server            # build the service (binary also committed as ./basic — gitignored is /kam)
+go test ./...                    # run tests
+go test ./internal/engine/ -run TestDecide -v   # the decision-engine tests (the only test package)
+go vet ./...
+
+docker compose up --build        # postgres + keto (migrated, OPL loaded) + kam on :8080
+curl -XPOST localhost:8080/v1/seed   # load prototype seed data and sync Keto tuples
+```
+
+The **engine tests run fully offline** — they back the engine with an in-memory `fakeStore` and `fakeKeto`
+(see `internal/engine/engine_test.go`), so no Postgres or Keto is needed. Anything touching `internal/store`
+or `internal/keto` needs the `docker compose` stack (Postgres on :5432, Keto read :4466 / write :4467).
 
 ## Architecture
 
-The whole app is in the `<script>` block of `access-control.html`. State lives in a single in-memory object `DB` (`{resources, items, conditions, roles, users}`), seeded by `seed()` and persisted to `localStorage` under the key `sentinel_db` via `save()`/`load()` (`migrate()` upgrades older saves). There is no test suite.
+This is a **hybrid engine** and that split is the single most important thing to understand — it is spread
+across `internal/keto`, `internal/engine`, and `keto/opl/permissions.ts`:
 
-### Resource types vs. items
+- **Ory Keto + OPL own the RBAC layer.** Keto is a Zanzibar/ReBAC engine; it resolves relationships
+  (role membership, role inheritance, role→action grants) but **cannot** express attribute comparisons or
+  deny-over-allow. The OPL model in `keto/opl/permissions.ts` declares one `<action>` relation and one
+  `deny_<action>` relation per action in `ActionsLib`. `Check`/`CheckDeny` answer base reachability.
+- **The Go engine overlays ABAC + precedence** (`internal/engine/engine.go`, `Decide`). It computes
+  effective grants from the Postgres snapshot for **trace provenance and which ABAC conditions to evaluate**,
+  but the **authoritative allow/deny reachability comes from Keto** (which resolves the inheritance tree).
+- **Postgres (GORM) is the system of record.** Every config mutation re-runs `keto.SyncAll`, which clears
+  the `Role` and `Resource` namespaces and rewrites all tuples from the current snapshot. Keto holds no
+  durable truth of its own — it is a derived index.
 
-- `DB.resources` are **resource types** (the classes roles get permissions on): `{key, name, domain, actions, attrs}`. A type has **no owner**. `attrs` is `[{key, value}]` — the type **declares** each ABAC attribute (exposed as `resource.<key>`) and the `value` is its **default**.
-- `DB.items` are **resource items** — concrete instances of a type: `{id, name, type, owner, attrs}` where `type` is a resource key, `owner` is a user id, and `attrs` is a `{key: value}` map of **per-item overrides** for the attributes the type declares (a missing/blank key inherits the type default; `resolveItemAttr()` does the lookup). Ownership and attribute values live only on items. `itemsByType(key)` / `itemById(id)` look them up.
+Tuple shapes written by `SyncAll` (must match the OPL namespaces/relations):
+- membership: `Role:<id>#members@User:<uid>`
+- inheritance (nested groups): `Role:<parent>#members@(Role:<child>#members)`
+- allow/conditional grant: `Resource:<key>#<action>@(Role:<rid>#members)`
+- deny grant: `Resource:<key>#deny_<action>@(Role:<rid>#members)`
 
-### The permission model (the part that requires reading multiple functions together)
+### Decision precedence (invariants — keep these intact)
 
-- **Roles** form an inheritance tree via `parent`. A role's `grants` map keys of the form `"<resourceKey>:<action>"` to an *effect*: `allow`, `deny`, or an ABAC condition id (seeded: `own` / `dept`). Condition labels come from `condLabel()`.
-- `roleChain(id)` walks self → ancestors. `effectiveRoleGrants(id)` flattens the chain so **closer roles override more distant ancestors** (it iterates furthest-ancestor-first, overwriting).
-- `effectiveUserGrants(userId)` merges grants across all of a user's roles with **deny-wins** precedence.
-- `decide(userId, resKey, action, ctx)` is the evaluation engine: resolves roles, finds the matching grant, then applies precedence rules — **no grant = default deny**, **explicit `deny` beats any allow**, otherwise `evalCondition()` checks the ABAC condition against the attribute bag from `buildAttrs()` (subject attrs from the user; `resource.*` resolved per the selected item's `attrs`/`owner`, falling back to the type's declared defaults). It returns `{allow, reason, trace}` where `trace` is the step list rendered in the Playground.
+`Decide` must preserve, exactly as the prototype does:
+1. **default-deny** — no reachable grant ⇒ deny.
+2. **deny-over-allow** — an explicit `deny` (resolved via Keto's `CheckDeny`) beats any allow.
+3. **nearer-role-over-ancestor** and **deny-wins across a user's roles** — implemented in the ported pure
+   helpers `roleChain` → `effectiveRoleGrants` → `effectiveUserGrants`.
+4. A conditional grant's ABAC conditions are **AND'd together** (all must pass); the attribute bag comes
+   from `buildAttrs` (subject.* from the user; `resource.*` from the selected item's overrides, falling back
+   to the resource type's declared defaults via `resolveItemAttr`).
 
-When changing access logic, keep these precedence invariants intact: default-deny, deny-over-allow, and nearer-role-over-ancestor.
+### Domain model (`internal/model/model.go`)
 
-### UI structure
+Ported from the prototype's in-memory `DB`. Note the distinctions:
+- **`ResourceType`** = a class roles get permissions on; **no owner**; `Attrs` *declares* each ABAC
+  attribute (`resource.<key>`) and its **default**.
+- **`Item`** = a concrete instance with an `Owner` and an `Attrs` map of **per-item overrides** (blank/missing
+  inherits the type default).
+- **`Role`** has `Parent` (inheritance) and `Grants` mapping `"<resourceKey>:<action>"` → `Effect`.
+- **`Effect`** has custom JSON: serializes to exactly `"allow"`, `"deny"`, or an array of condition ids
+  `["sod","active"]`. A legacy single-id string is accepted on read. Always go through this type; do not
+  emit raw effect JSON elsewhere.
+- Grant keys are split with `keto.SplitGrantKey` (uses `LastIndex(":")` because resource keys contain dots,
+  e.g. `billing.invoice:approve`).
 
-Two tabs (`switchView`): **Configuration** (role list, user list, the permission matrix) and **Playground** (simulate a `decide()` call and view the trace + effective permissions).
+### Layout
 
-- The matrix (`renderMatrix`) is per resource **type**, with fixed columns from `ACTIONS_LIB`; cells exist only for actions a type declares. Clicking a cell calls `cyclePerm` which rotates `none → allow → each defined condition → deny`. Inherited cells are read-only. The Playground picks a type **and** an item (the item supplies `resource.owner`).
-- Rendering is plain string-templating into `innerHTML`. All user-supplied text must pass through `esc()` to avoid breaking markup.
-- `renderAll()` re-renders everything after any mutation; most handlers follow the pattern `mutate DB → save() → renderAll() → toast()`.
+```
+cmd/server       service entrypoint (waits for Postgres with retry, then serves)
+internal/model   GORM domain types (+ Effect custom JSON)
+internal/seed    prototype seed data (also drives the offline engine tests)
+internal/store   GORM persistence; Open() runs AutoMigrate; Snapshot/ReplaceAll
+internal/keto    Keto gRPC client; SyncAll rebuilds tuples; Check/CheckDeny
+internal/engine  decision engine — the decide() port + ABAC evaluation
+internal/httpapi chi router; generic crud[T] for the 5 entity types; /check /expand /seed
+internal/config  env config (KAM_HTTP_ADDR, KAM_DATABASE_URL, KAM_KETO_READ_URL, KAM_KETO_WRITE_URL)
+pkg/sdk          Go client — standard-library only (embeds without pulling in a DB driver)
+pkg/middleware   HTTP guard middleware (Guard / RequirePermission)
+keto/opl         OPL permission model
+examples/        runnable usage samples (basic, middleware)
+access-control.html  the original single-file prototype this backend ports
+```
+
+The HTTP CRUD for all five entities is generated by the generic `crud[T]` helper in `internal/httpapi/api.go`;
+every mutating handler re-syncs Keto. The Keto client talks **gRPC** (not REST) even though the env vars are
+named like URLs — `grpcTarget` strips any `http://` scheme.
 
 ## Conventions
 
-- New IDs come from `uid(prefix)`. Resource keys are unique strings like `billing.invoice`; grant keys are `"<key>:<action>"`.
-- After mutating `DB`, always call `save()` then the relevant render function(s).
+- Keep the Go engine **behavior-compatible with `decide()` in `access-control.html`** — the helpers carry
+  "ports X()" comments tying them back to the prototype function.
+- After any config mutation: persist to Postgres, then call `keto.SyncAll` to rebuild tuples. Keto is never
+  the source of truth.
 - `.claude/settings.json` disables the Playwright plugin for this project.

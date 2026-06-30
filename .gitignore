@@ -1,0 +1,6 @@
+# Binaries
+/kam
+*.exe
+
+# Local env overrides
+.env

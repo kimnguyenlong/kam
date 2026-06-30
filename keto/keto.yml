@@ -1,0 +1,22 @@
+# Ory Keto configuration for KAM. The permission model is defined in OPL (see opl/permissions.ts).
+version: v0.12.0
+
+# DSN is supplied via the DSN environment variable (see docker-compose.yml).
+
+namespaces:
+  location: file:///home/ory/opl/permissions.ts
+
+serve:
+  read:
+    host: 0.0.0.0
+    port: 4466
+  write:
+    host: 0.0.0.0
+    port: 4467
+  metrics:
+    host: 0.0.0.0
+    port: 4468
+
+log:
+  level: info
+  format: text

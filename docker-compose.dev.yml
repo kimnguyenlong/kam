@@ -1,0 +1,36 @@
+# Dev override: hot reload for the Go service and the Next.js frontend.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+#
+# postgres/keto come from the base compose unchanged. Both app services build
+# their `dev` Dockerfile target and bind-mount the source tree.
+services:
+  kam:
+    build:
+      context: .
+      target: dev
+    volumes:
+      # Live source for air to watch.
+      - .:/src
+      # Keep the module cache and build tmp dir off the host bind mount.
+      - go-mod-cache:/go/pkg/mod
+      - kam-tmp:/src/tmp
+
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    environment:
+      # KAM_API_BASE_URL comes from frontend/.env (base compose env_file).
+      # File watching across the macOS/Docker bind mount needs polling.
+      WATCHPACK_POLLING: "true"
+    volumes:
+      - ./frontend:/app
+      # Anonymous volumes shadow the host so baked node_modules/.next survive.
+      - /app/node_modules
+      - /app/.next
+
+volumes:
+  pgdata:
+  go-mod-cache:
+  kam-tmp:

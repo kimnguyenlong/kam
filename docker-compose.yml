@@ -1,0 +1,77 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./deploy/postgres-init.sql:/docker-entrypoint-initdb.d/10-keto-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # One-shot: create/upgrade Keto's schema in the `keto` database.
+  keto-migrate:
+    image: oryd/keto:v0.12.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DSN: ${KETO_DSN}
+    volumes:
+      - ./keto:/home/ory
+    command: ["migrate", "up", "-y", "-c", "/home/ory/keto.yml"]
+    restart: on-failure
+
+  keto:
+    image: oryd/keto:v0.12.0
+    depends_on:
+      keto-migrate:
+        condition: service_completed_successfully
+    environment:
+      DSN: ${KETO_DSN}
+    volumes:
+      - ./keto:/home/ory
+    command: ["serve", "-c", "/home/ory/keto.yml"]
+    ports:
+      - "4466:4466" # read API (check) — gRPC + REST
+      - "4467:4467" # write API (relation tuples) — gRPC + REST
+
+  kam:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keto:
+        condition: service_started
+    # Service config (KAM_*) comes from the root .env; see .env.example.
+    env_file:
+      - .env
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: ./frontend
+      # Build-time vars (NEXT_PUBLIC_*) must be passed here as build args — Next
+      # inlines them into the client bundle at `next build`. None used yet.
+      # args:
+      #   NEXT_PUBLIC_APP_NAME: KAM
+    depends_on:
+      kam:
+        condition: service_started
+    # Runtime config (KAM_API_BASE_URL) comes from frontend/.env; see
+    # frontend/.env.example. Build-time vars do NOT belong here — see build.args.
+    env_file:
+      - ./frontend/.env
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:

@@ -1,0 +1,222 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* ============================================================
+   K Labs Design System — Stone Edition
+   Ported from the Claude Design project "K Labs Design System".
+   Warm light palette (stone ramp + tan accent), Space Grotesk /
+   Geist / JetBrains Mono, restrained radii, hairline borders,
+   soft warm shadows. shadcn semantic vars are mapped onto these.
+   ============================================================ */
+
+:root {
+  /* --- Stone ramp ---------------------------------------- */
+  --stone-950: #141210;
+  --stone-925: #1a1714;
+  --stone-900: #211d1a;
+  --stone-850: #2a2420;
+  --stone-800: #352e29;
+  --stone-750: #413832;
+  --stone-700: #524540;
+  --stone-600: #6b5c53;
+  --stone-500: #8a7870;
+  --stone-400: #a89890;
+  --stone-300: #c9b59c;
+  --stone-200: #d9cfc7;
+  --stone-100: #efe9e3;
+  --stone-050: #f9f8f6;
+
+  /* --- Tan accent ramp ----------------------------------- */
+  --tan-500: #977f68;
+  --tan-400: #b09880;
+  --tan-300: #c9b59c;
+  --tan-200: #ddd0be;
+  --tan-100: #ede5d8;
+  --tan-glow: rgba(201, 181, 156, 0.2);
+
+  /* --- Status -------------------------------------------- */
+  --amber-400: #c49840;
+  --rose-400: #b07070;
+  --rose-500: #9a5a5a;
+  --sky-400: #7898a8;
+  --violet-400: #8878a8;
+
+  /* --- Surfaces ------------------------------------------ */
+  --surface-base: var(--stone-050);
+  --surface-default: var(--stone-100);
+  --surface-card: var(--stone-100);
+  --surface-raised: #e5ddd5;
+  --surface-hover: var(--stone-200);
+  --surface-inset: var(--stone-100);
+  --surface-overlay: rgba(42, 32, 28, 0.48);
+
+  /* --- Text ---------------------------------------------- */
+  --text-primary: #29201c;
+  --text-secondary: var(--stone-600);
+  --text-tertiary: var(--stone-500);
+  --text-disabled: var(--stone-300);
+  --text-on-accent: #29201c;
+  --text-link: var(--stone-600);
+  --text-eyebrow: #7a6a5e;
+
+  /* --- Borders ------------------------------------------- */
+  --border-subtle: rgba(42, 32, 28, 0.06);
+  --border-default: var(--stone-200);
+  --border-strong: #c4b4a6;
+  --border-accent: var(--tan-300);
+
+  /* --- Accent -------------------------------------------- */
+  --accent-base: var(--tan-300);
+  --accent-strong: var(--tan-400);
+  --accent-muted: rgba(201, 181, 156, 0.18);
+  --accent-foreground: #29201c;
+
+  /* --- Status semantic ----------------------------------- */
+  --success: #6e7b60;
+  --success-muted: rgba(110, 123, 96, 0.18);
+  --warning: var(--amber-400);
+  --warning-muted: rgba(196, 152, 64, 0.16);
+  --danger: var(--rose-400);
+  --danger-muted: rgba(176, 112, 112, 0.16);
+  --info: var(--sky-400);
+  --info-muted: rgba(120, 152, 168, 0.16);
+
+  /* --- Radius -------------------------------------------- */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-control: var(--radius-md);
+  --radius-card: var(--radius-lg);
+  --radius-modal: var(--radius-xl);
+
+  /* --- Elevation ----------------------------------------- */
+  --shadow-xs: 0 1px 3px rgba(42, 32, 28, 0.08);
+  --shadow-sm: 0 1px 3px rgba(42, 32, 28, 0.08), 0 2px 8px rgba(42, 32, 28, 0.05);
+  --shadow-md: 0 4px 16px rgba(42, 32, 28, 0.1), 0 1px 3px rgba(42, 32, 28, 0.07);
+  --shadow-lg: 0 12px 36px rgba(42, 32, 28, 0.12), 0 2px 6px rgba(42, 32, 28, 0.07);
+  --shadow-xl: 0 24px 64px rgba(42, 32, 28, 0.16), 0 4px 12px rgba(42, 32, 28, 0.09);
+  --ring-hairline: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  --glow-accent: 0 6px 20px rgba(201, 181, 156, 0.28);
+  --shadow-inset: inset 0 1px 2px rgba(42, 32, 28, 0.08);
+
+  /* --- Motion -------------------------------------------- */
+  --duration-fast: 140ms;
+  --duration-base: 200ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* --- Fonts (bound to next/font CSS variables) ---------- */
+  --font-display: var(--font-space-grotesk), "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  /* ============================================================
+     shadcn semantic tokens → mapped onto K Labs values
+     ============================================================ */
+  --radius: var(--radius-md);
+  --background: var(--surface-base);
+  --foreground: var(--text-primary);
+  --card: var(--surface-card);
+  --card-foreground: var(--text-primary);
+  --popover: var(--stone-050);
+  --popover-foreground: var(--text-primary);
+  --primary: var(--accent-base);
+  --primary-foreground: var(--accent-foreground);
+  --secondary: var(--surface-raised);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--surface-default);
+  --muted-foreground: var(--text-secondary);
+  --accent: var(--accent-muted);
+  --accent-foreground: var(--text-primary);
+  --destructive: var(--danger);
+  --destructive-foreground: #1a0608;
+  --border: var(--border-default);
+  --input: var(--border-default);
+  --ring: var(--tan-300);
+}
+
+/* Expose tokens to Tailwind utilities (v4 @theme inline). */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-hover: var(--surface-hover);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-success: var(--success);
+  --color-success-muted: var(--success-muted);
+  --color-warning: var(--warning);
+  --color-warning-muted: var(--warning-muted);
+  --color-danger: var(--danger);
+  --color-danger-muted: var(--danger-muted);
+  --color-info: var(--info);
+  --color-info-muted: var(--info-muted);
+  --color-accent-base: var(--accent-base);
+  --color-accent-muted: var(--accent-muted);
+
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+
+  --shadow-kl-sm: var(--shadow-sm);
+  --shadow-kl-md: var(--shadow-md);
+  --shadow-kl-lg: var(--shadow-lg);
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background-color: var(--surface-base);
+}
+
+::selection {
+  background: var(--accent-muted);
+  color: var(--text-primary);
+}
+
+/* Mono eyebrow / kicker used across the K Labs brand. */
+.kl-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-eyebrow);
+}

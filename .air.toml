@@ -1,0 +1,14 @@
+# air config for hot-reloading the kam service in dev (docker-compose.dev.yml).
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/kam ./cmd/server"
+  bin = "./tmp/kam"
+  delay = 500
+  exclude_dir = ["tmp", "frontend", "deploy", "keto", "examples", "node_modules"]
+  include_ext = ["go", "mod"]
+  stop_on_error = true
+
+[misc]
+  clean_on_exit = true
